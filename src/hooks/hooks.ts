@@ -31,7 +31,10 @@ export function useAction() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {
+    alive.current = true; // StrictMode runs effect -> cleanup -> effect, so re-arm on every mount
+    return () => { alive.current = false; };
+  }, []);
   const run = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
     setBusy(true);
     setError(null);
