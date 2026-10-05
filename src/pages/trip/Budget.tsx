@@ -47,11 +47,13 @@ export default function Budget() {
     e.preventDefault();
     const ok = await run(async () => {
       const entries: [BudgetCategory | null, string][] = [[null, vals.total ?? ''], ...BUDGET_CATEGORIES.map((c): [BudgetCategory, string] => [c, vals[c] ?? ''])];
-      for (const [cat, raw] of entries) {
+      const parsed = entries.map(([cat, raw]) => {
+        if (!raw.trim()) return { cat, cents: null as number | null };
+        try { return { cat, cents: parseMoney(raw, currency) }; } catch (x) { throw new Error(`${cat ?? 'Total'}: ${(x as MoneyError).message}`); }
+      }); // validate everything first so a typo never leaves a half-saved budget
+      for (const { cat, cents } of parsed) {
         const existing = data.budgets.find((b) => b.category === cat);
-        if (!raw.trim()) { if (existing) await rows.remove('budgets', existing.id); continue; }
-        let cents: number;
-        try { cents = parseMoney(raw, currency); } catch (x) { throw new Error(`${cat ?? 'Total'}: ${(x as MoneyError).message}`); }
+        if (cents === null) { if (existing) await rows.remove('budgets', existing.id); continue; }
         if (existing) await rows.update('budgets', existing.id, { amount_cents: cents, currency });
         else await rows.insert('budgets', { trip_id: data.trip.id, category: cat, amount_cents: cents, currency });
       }

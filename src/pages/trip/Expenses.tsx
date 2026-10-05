@@ -15,7 +15,7 @@ import { Alert, Dialog, Empty, ErrorBanner, Field } from '../../components/ui';
 
 const METHODS: [SplitMethod, string][] = [['equal', 'Equally'], ['custom', 'Custom amounts'], ['percent', 'Percentages'], ['shares', 'Shares']];
 const bpToInput = (bp: number) => `${Math.floor(bp / 100)}.${String(bp % 100).padStart(2, '0')}`;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; };
 
 interface Part { on: boolean; value: string }
 interface Form {

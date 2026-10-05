@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { trips } from '../../api/api';
 import { useTrip } from '../../hooks/contexts';
@@ -15,6 +15,9 @@ export default function Settings() {
     name: t.name, description: t.description ?? '', start_date: t.start_date, end_date: t.end_date, cover_image_url: t.cover_image_url ?? '',
     primary_destination: t.primary_destination ?? '', status: t.status as TripStatus, notes: t.notes ?? '', default_currency: t.default_currency, budget_near_pct: String(t.budget_near_pct),
   });
+  useEffect(() => {
+    setF({ name: t.name, description: t.description ?? '', start_date: t.start_date, end_date: t.end_date, cover_image_url: t.cover_image_url ?? '', primary_destination: t.primary_destination ?? '', status: t.status as TripStatus, notes: t.notes ?? '', default_currency: t.default_currency, budget_near_pct: String(t.budget_near_pct) });
+  }, [t]);
   const [errs, setErrs] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const { busy, error, run } = useAction();

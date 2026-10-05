@@ -138,7 +138,7 @@ export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { e
       <div className="row-between">
         <div className="row">
           {!readOnly && <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add to itinerary'}</button>}
-          <button type="button" className="btn" onClick={onCancel}>Cancel</button>
+          <button type="button" className="btn" onClick={() => { clear(); onCancel(); }}>Cancel</button>
         </div>
         {editing && !readOnly && <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>Delete</button>}
       </div>

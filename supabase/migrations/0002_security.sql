@@ -286,13 +286,25 @@ begin
   return v_id;
 end $$;
 
+create or replace function public.appears_in_expenses(t uuid, u uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.expenses e where e.trip_id = t and e.paid_by = u)
+      or exists (select 1 from public.expense_splits s join public.expenses e on e.id = s.expense_id where e.trip_id = t and s.user_id = u)
+$$;
+
 -- Record that a debt was paid (a ledger entry only; no money moves). Append-only.
 create or replace function public.record_settlement(p_trip uuid, p_from uuid, p_to uuid, p_amount bigint, p_currency text, p_date date, p_note text) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid;
 begin
   if not public.can_edit_trip(p_trip) then raise exception 'Not allowed' using errcode = '42501'; end if;
-  if not (public.is_member_of(p_trip, p_from) and public.is_member_of(p_trip, p_to)) then
+  -- Only the payer, the receiver, or the owner may record a payment (an editor cannot forge one between others).
+  if auth.uid() not in (p_from, p_to) and not public.is_trip_owner(p_trip) then
+    raise exception 'Not allowed' using errcode = '42501';
+  end if;
+  -- Both must be members, or former members who still appear in this trip's expenses (so their debts can be cleared).
+  if not (public.is_member_of(p_trip, p_from) or public.appears_in_expenses(p_trip, p_from))
+     or not (public.is_member_of(p_trip, p_to) or public.appears_in_expenses(p_trip, p_to)) then
     raise exception 'Both people must be trip members' using errcode = '23503';
   end if;
   insert into public.settlements (trip_id, from_user, to_user, amount_cents, currency, settled_on, note, recorded_by)
@@ -301,9 +313,41 @@ begin
   return v_id;
 end $$;
 
+-- Rows can never be moved to another trip by UPDATE.
+create or replace function public.pin_trip_id() returns trigger
+language plpgsql as $$
+begin
+  if new.trip_id is distinct from old.trip_id then
+    raise exception 'trip_id cannot be changed' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+do $$
+declare t text;
+begin
+  foreach t in array array['destinations','itinerary_items','reservations','budgets','notes','packing_categories','packing_items'] loop
+    execute format('create trigger %I before update on public.%I for each row execute function public.pin_trip_id()', t || '_pin_trip', t);
+  end loop;
+end $$;
+
+-- A packing item must live in a category of the same visibility and owner.
+create or replace function public.check_packing_category() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.packing_categories c where c.id = new.category_id
+                 and c.is_shared = new.is_shared and c.owner_id is not distinct from new.owner_id) then
+    raise exception 'Item must be in a category of the same list (shared or personal)' using errcode = '23514';
+  end if;
+  return new;
+end $$;
+create trigger packing_items_category before insert or update on public.packing_items
+  for each row execute function public.check_packing_category();
+
 -- Re-apply function grants for anything created above.
 revoke execute on all functions in schema public from public, anon;
 grant execute on all functions in schema public to authenticated;
 -- trigger-only functions need no client access
+revoke execute on function public.is_member_of(uuid, uuid), public.appears_in_expenses(uuid, uuid) from authenticated;
+revoke execute on function public.pin_trip_id(), public.check_packing_category() from authenticated;
 revoke execute on function public.handle_new_user(), public.add_owner_member(), public.check_expense_total(),
   public.check_note_target(), public.check_packing_assignee(), public.set_updated_at() from authenticated;

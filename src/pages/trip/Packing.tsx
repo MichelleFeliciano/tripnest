@@ -72,8 +72,8 @@ export default function Packing() {
     <div>
       <div className="row-between">
         <div className="seg" role="group" aria-label="Packing list">
-          <button aria-pressed={shared} onClick={() => setShared(true)}>Shared</button>
-          <button aria-pressed={!shared} onClick={() => setShared(false)}>My list</button>
+          <button aria-pressed={shared} onClick={() => { setShared(true); setF((x) => ({ ...x, category: '' })); }}>Shared</button>
+          <button aria-pressed={!shared} onClick={() => { setShared(false); setF((x) => ({ ...x, category: '' })); }}>My list</button>
         </div>
         {canManage && (
           <div className="row">

@@ -43,15 +43,23 @@ export function tzOffsetMs(utcMs: number, tz: string): number {
   return asUtc - Math.floor(utcMs / 1000) * 1000;
 }
 
-/** "2026-06-12" + "08:00" in `tz` -> UTC Date. Nonexistent (DST gap) times roll forward. */
+/**
+ * "2026-06-12" + "08:00" in `tz` -> UTC Date.
+ * Tries the offset in force a day before and a day after; takes the first one that is self-consistent.
+ * Ambiguous times (fall-back) resolve to the first occurrence; nonexistent times (spring-forward gap)
+ * roll forward by the gap (02:30 becomes 03:30).
+ */
 export function zonedToUtc(date: string, time: string, tz: string): Date {
   const [y, mo, d] = date.split('-').map(Number);
   const [h, mi] = time.split(':').map(Number);
   const naive = Date.UTC(y, mo - 1, d, h, mi, 0);
-  let utc = naive - tzOffsetMs(naive, tz);
-  const off2 = tzOffsetMs(utc, tz);
-  if (naive - off2 !== utc) utc = naive - off2; // crossed a DST boundary
-  return new Date(utc);
+  const before = tzOffsetMs(naive - 86_400_000, tz);
+  const after = tzOffsetMs(naive + 86_400_000, tz);
+  const c1 = naive - before;
+  if (tzOffsetMs(c1, tz) === before) return new Date(c1);
+  const c2 = naive - after;
+  if (tzOffsetMs(c2, tz) === after) return new Date(c2);
+  return new Date(c1); // gap
 }
 
 /** The local calendar date ("YYYY-MM-DD") of an instant in `tz`. */

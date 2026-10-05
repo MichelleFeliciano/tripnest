@@ -216,3 +216,16 @@ describe('search', () => {
     expect(searchDocs(docs, '  ')).toEqual([]);
   });
 });
+
+describe('QA regression fixes: DST', () => {
+  it('a time inside the spring-forward gap rolls forward, not backward', () => {
+    const d = zonedToUtc('2026-03-08', '02:30', 'America/New_York');
+    expect(localTime(d, 'America/New_York')).toBe('03:30');
+  });
+  it('ambiguous fall-back time resolves to the first occurrence', () => {
+    expect(zonedToUtc('2026-11-01', '01:30', 'America/Chicago').toISOString()).toBe('2026-11-01T06:30:00.000Z');
+  });
+  it('rejects trips longer than a year', () => {
+    expect(validateTrip({ name: 'x', startDate: '2026-01-01', endDate: '2027-06-01' })).toContain('Trips can be at most one year long');
+  });
+});

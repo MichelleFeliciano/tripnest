@@ -3,7 +3,7 @@
 All of this is deterministic code in `src/lib/{money,splits,balances,budget}.ts`. **No AI is involved in any calculation.**
 
 ## Representation
-Money is an integer number of *minor units* (`amount_cents`): cents for USD, whole yen for JPY (exponent 0), 3 decimals for BHD/KWD, default exponent 2. Floats never take part in arithmetic. Decimal text is parsed with string operations (`parseMoney`), so `"0.29"` is exactly `29`. Parsing rejects negatives, junk, more decimals than the currency allows, and absurd magnitudes (> 10^13 minor units). The database stores `bigint` with `CHECK (amount_cents > 0)`.
+Money is an integer number of *minor units* (`amount_cents`): cents for USD, whole yen for JPY (exponent 0), 3 decimals for BHD/KWD, default exponent 2. Floats never take part in arithmetic. Decimal text is parsed with string operations (`parseMoney`), so `"0.29"` is exactly `29`. Parsing rejects negatives, junk, more decimals than the currency allows, and absurd magnitudes (> 10^11 minor units). The database stores `bigint` with `CHECK (amount_cents > 0)`.
 
 ## Splitting (`computeSplits`)
 Every method returns amounts that sum **exactly** to the total, or throws.
@@ -15,7 +15,7 @@ Every method returns amounts that sum **exactly** to the total, or throws.
 | Percent | basis points (50.00% = 5000) | Must sum to exactly 10000 (100.00%). Amounts by **largest remainder**. |
 | Shares | positive integers | Amounts by largest remainder (weights = shares). |
 
-**Largest-remainder rounding:** give everyone `floor(total * weight / sumWeights)`, then hand the remaining cents one at a time to the people with the biggest fractional remainders (ties go to the earlier participant in the list). All arithmetic is integer; `total * weight` stays far below 2^53. Rounding therefore can never create or lose a cent. Tests check this for every total from 1 to 300 across many weightings.
+**Largest-remainder rounding:** give everyone `floor(total * weight / sumWeights)`, then hand the remaining cents one at a time to the people with the biggest fractional remainders (ties go to the earlier participant in the list). All arithmetic is integer; `total * weight` stays below 2^53 because amounts are capped at 10^11 minor units (1 billion major units) times 10,000 basis points. Rounding therefore can never create or lose a cent. Tests check this for every total from 1 to 300 across many weightings.
 
 Also rejected: empty participant list, duplicate participants, non-integer or non-positive totals.
 

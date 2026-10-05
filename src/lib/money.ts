@@ -12,14 +12,16 @@ export function currencyExponent(currency: string): number {
   return EXPONENTS[currency.toUpperCase()] ?? 2;
 }
 
-export const MAX_MINOR_UNITS = 100_000_000_000_00; // far inside 2^53
+export const MAX_MINOR_UNITS = 100_000_000_000; // 1e11: keeps total*10000 (percent weights) below 2^53
 
 export class MoneyError extends Error {}
 
 /** Parse "12", "12.5", "1,234.56", "$12.50" to minor units. Rejects junk, negatives, excess precision. */
 export function parseMoney(input: string, currency = 'USD'): number {
   const exp = currencyExponent(currency);
-  const cleaned = input.trim().replace(/^[^\d.\-+]+/, '').replace(/,/g, '');
+  let cleaned = input.trim().replace(/^[^\d.\-+]+/, '');
+  // European style "12,50": a single comma followed by 1-2 digits and no dot is a decimal separator.
+  cleaned = /^\d+,\d{1,2}$/.test(cleaned) ? cleaned.replace(',', '.') : cleaned.replace(/,/g, '');
   if (!/^\d*\.?\d*$/.test(cleaned) || cleaned === '' || cleaned === '.') {
     throw new MoneyError('Enter a valid amount, for example 25.00');
   }

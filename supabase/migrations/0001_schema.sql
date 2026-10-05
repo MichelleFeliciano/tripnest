@@ -244,7 +244,7 @@ create table public.expenses (
   created_by uuid not null references auth.users(id) on delete restrict default auth.uid(),
   paid_by uuid not null references auth.users(id) on delete restrict,
   description text not null check (char_length(btrim(description)) between 1 and 200),
-  amount_cents bigint not null check (amount_cents > 0 and amount_cents <= 100000000000000),
+  amount_cents bigint not null check (amount_cents > 0 and amount_cents <= 100000000000),
   currency text not null default 'USD' check (currency ~ '^[A-Z]{3}$'),
   expense_date date not null,
   category text not null default 'Other' check (category in ('Lodging','Food','Transportation','Activities','Shopping','Tickets','Gas','Other')),
@@ -296,7 +296,7 @@ create table public.settlements (
   trip_id uuid not null references public.trips(id) on delete cascade,
   from_user uuid not null references auth.users(id) on delete restrict, -- paid
   to_user uuid not null references auth.users(id) on delete restrict,   -- received
-  amount_cents bigint not null check (amount_cents > 0 and amount_cents <= 100000000000000),
+  amount_cents bigint not null check (amount_cents > 0 and amount_cents <= 100000000000),
   currency text not null check (currency ~ '^[A-Z]{3}$'),
   settled_on date not null default current_date,
   note text check (char_length(note) <= 500),

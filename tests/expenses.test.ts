@@ -230,3 +230,18 @@ describe('partial settlements', () => {
     expect(suggestSettlements(net)).toEqual([{ from: 'michelle', to: 'jon', amountCents: 2000, currency: 'USD' }]);
   });
 });
+
+describe('QA regression fixes: money input', () => {
+  it('reads a single comma with 1-2 digits as a decimal separator (EUR style)', () => {
+    expect(parseMoney('12,50', 'EUR')).toBe(1250);
+    expect(parseMoney('0,5', 'EUR')).toBe(50);
+    expect(parseMoney('1,234')).toBe(123400); // 3 digits after comma = thousands separator
+    expect(parseMoney('1,234.56')).toBe(123456);
+  });
+  it('percent/shares stay exact at the maximum allowed amount', () => {
+    const max = 100_000_000_000;
+    const r = computeSplits(max, 'percent', [{ userId: 'a', value: 3333 }, { userId: 'b', value: 3333 }, { userId: 'c', value: 3334 }]);
+    expect(r.reduce((a, b) => a + b.amountCents, 0)).toBe(max);
+    expect(() => parseMoney('1000000000.01')).toThrow(MoneyError);
+  });
+});

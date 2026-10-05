@@ -397,3 +397,37 @@ describe('time zones & itinerary constraints', () => {
     expect(r[0]).toMatchObject({ start_tz: 'America/Chicago', end_tz: 'America/Puerto_Rico' });
   });
 });
+
+describe('QA regression fixes', () => {
+  const rec = (u: U, from: U, to: U, amt: number) => q(u, `select record_settlement($1, $2, $3, $4, 'USD', '2026-06-19', null)`, [trip, from.id, to.id, amt]);
+  it('an editor cannot forge a settlement between two other people', async () => {
+    await expect(rec(bob, alice, carol, 500)).rejects.toThrow(/not allowed/i);
+    await rec(bob, bob, carol, 500); // payer may record
+    await rec(carol, bob, carol, 500).catch(() => undefined); // viewer still cannot
+    await rec(alice, bob, carol, 500); // owner may record any
+  });
+  it('a former member with expense history can still be settled; strangers cannot', async () => {
+    const zed = U(9, 'zed');
+    await db.query(`insert into auth.users (id, email) values ($1, $2)`, [zed.id, zed.email]);
+    const tok = (await q<{ create_invitation: string }>(alice, `select create_invitation($1, $2, 'editor')`, [trip, zed.email]))[0].create_invitation;
+    await q(zed, `select accept_invitation($1)`, [tok]);
+    await q(zed, `select save_expense($1, null, $2::jsonb, $3::jsonb)`, [trip, JSON.stringify({ paid_by: zed.id, description: 'Taxi', amount_cents: 1000, expense_date: '2026-06-12', split_method: 'equal' }), JSON.stringify([{ user_id: zed.id, amount_cents: 500 }, { user_id: alice.id, amount_cents: 500 }])]);
+    await q(alice, `delete from trip_members where trip_id = $1 and user_id = $2`, [trip, zed.id]);
+    expect(await q(alice, `select record_settlement($1, $2, $3, 500, 'USD', null, null)`, [trip, alice.id, zed.id])).toHaveLength(1);
+    await expect(q(alice, `select record_settlement($1, $2, $3, 500, 'USD', null, null)`, [trip, alice.id, dave.id])).rejects.toThrow(/trip members/i);
+  });
+  it('rows cannot be moved to another trip via UPDATE', async () => {
+    await q(dave, `insert into trip_members (trip_id, user_id, role) values ($1, $2, 'owner')`, [otherTrip, bob.id]).catch(() => undefined);
+    const dId = (await q<{ id: string }>(bob, `insert into destinations (trip_id, name) values ($1, 'Movable') returning id`, [trip]))[0].id;
+    await expect(db.query(`update destinations set trip_id = $2 where id = $1`, [dId, otherTrip])).rejects.toThrow(/trip_id cannot be changed/);
+  });
+  it('packing items must match their category visibility', async () => {
+    const mine = (await q<{ id: string }>(carol, `select id from packing_categories where name = 'Mine'`))[0].id;
+    const shared = (await q<{ id: string }>(alice, `select id from packing_categories where name = 'Shared'`))[0].id;
+    await expect(q(carol, `insert into packing_items (trip_id, category_id, name, is_shared, owner_id) values ($1, $2, 'x', false, $3)`, [trip, shared, carol.id])).rejects.toThrow(/same list/i);
+    await expect(q(bob, `insert into packing_items (trip_id, category_id, name) values ($1, $2, 'x')`, [trip, mine])).rejects.toThrow();
+  });
+  it('the membership oracle helper is not callable by clients', async () => {
+    await expect(q(dave, `select is_member_of($1, $2)`, [trip, alice.id])).rejects.toThrow(/permission denied/i);
+  });
+});

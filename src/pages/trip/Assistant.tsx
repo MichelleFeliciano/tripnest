@@ -33,8 +33,8 @@ export default function Assistant() {
     if (!r) return;
     setCached(r.cached);
     const res = r.result as { ideas?: Idea[]; categories?: PackCat[]; summary?: string };
-    if (kind === 'itinerary') setIdeas(Array.isArray(res.ideas) ? res.ideas.slice(0, 30) : []);
-    if (kind === 'packing') setPack(Array.isArray(res.categories) ? res.categories.slice(0, 15) : []);
+    if (kind === 'itinerary') setIdeas(Array.isArray(res.ideas) ? res.ideas.filter((i) => i && typeof i.title === 'string' && Number.isFinite(Number(i.day))).slice(0, 30).map((i) => ({ day: Number(i.day), title: i.title, description: typeof i.description === 'string' ? i.description : '' })) : []);
+    if (kind === 'packing') setPack(Array.isArray(res.categories) ? res.categories.filter((c) => c && typeof c.name === 'string' && Array.isArray(c.items)).slice(0, 15).map((c) => ({ name: c.name, items: c.items.filter((x) => typeof x === 'string') })) : []);
     if (kind === 'summary') setSummary(typeof res.summary === 'string' ? res.summary : '');
   };
 

@@ -38,11 +38,13 @@ Deno.serve(async (req) => {
   let body: { tripId?: string; kind?: string; input?: Record<string, unknown> };
   try { body = await req.json(); } catch { return json({ error: 'Invalid request' }, 400); }
   const { tripId, kind } = body;
-  if (!tripId || !kind || !(kind in INSTRUCTIONS)) return json({ error: 'Invalid request' }, 400);
+  if (!tripId || !kind || !Object.hasOwn(INSTRUCTIONS, kind)) return json({ error: 'Invalid request' }, 400);
 
   // RLS gate: the user can only read trips they belong to
   const { data: trip } = await userClient.from('trips').select('id,name,start_date,end_date,primary_destination,description').eq('id', tripId).maybeSingle();
   if (!trip) return json({ error: 'Trip not found' }, 404);
+  const { data: mem } = await userClient.from('trip_members').select('role').eq('trip_id', tripId).eq('user_id', u.user.id).maybeSingle();
+  if (!mem || mem.role === 'viewer') return json({ error: 'Editors and owners only' }, 403);
   const { data: dests } = await userClient.from('destinations').select('name,country').eq('trip_id', tripId);
   const { data: items } = await userClient.from('itinerary_items').select('local_date,title,item_type').eq('trip_id', tripId).order('local_date').limit(60);
 

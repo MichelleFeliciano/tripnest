@@ -4,7 +4,7 @@ import { useTrip } from '../../hooks/contexts';
 import { itemLike } from '../../api/adapters';
 import type { ItineraryRow } from '../../api/types';
 import { findConflicts, groupByDay } from '../../lib/itinerary';
-import { addDays, dayIndex, tripDates } from '../../lib/trip';
+import { addDays, dayIndex, isValidIsoDate, tripDates } from '../../lib/trip';
 import { formatDateLong, formatDateShort } from '../../lib/time';
 import { Alert, Dialog, Empty } from '../../components/ui';
 import ItemRow from '../../components/ItemRow';
@@ -22,7 +22,7 @@ export default function Itinerary() {
   const dates = useMemo(() => tripDates(trip.start_date, trip.end_date), [trip]);
   const view = (VIEWS.find(([v]) => v === sp.get('view'))?.[0] ?? 'timeline') as View;
   const reqDate = sp.get('date');
-  const date = reqDate && /^\d{4}-\d{2}-\d{2}$/.test(reqDate) ? reqDate : dates[0];
+  const date = reqDate && isValidIsoDate(reqDate) ? reqDate : dates[0];
   const [form, setForm] = useState<{ open: boolean; editing: ItineraryRow | null }>({ open: sp.get('new') === '1', editing: null });
 
   const likes = useMemo(() => data.items.map(itemLike), [data.items]);
@@ -140,7 +140,7 @@ export default function Itinerary() {
       )}
 
       <Dialog open={form.open} onClose={close} title={form.editing ? 'Edit itinerary item' : 'Add itinerary item'}>
-        <ItemForm editing={form.editing} defaultDate={view === 'timeline' ? undefined : date} onDone={close} onCancel={close} />
+        <ItemForm editing={form.editing} defaultDate={reqDate && isValidIsoDate(reqDate) ? reqDate : undefined} onDone={close} onCancel={close} />
       </Dialog>
     </div>
   );
