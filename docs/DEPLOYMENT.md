@@ -26,3 +26,15 @@ Then set `VITE_AI_ENABLED=true` and redeploy the frontend. Restrict the function
 
 ## 4. Smoke test after deploy
 Sign up → confirm email → create a trip → invite a second account (copy the link, open it in a private window with that email) → add an itinerary item → add an expense split three ways → mark a payment → upload a PDF and open it → download the `.ics` file.
+
+## GitHub Pages (what this project uses)
+The workflow `.github/workflows/deploy.yml` runs the tests, builds with the sub-path `/<repo>/`, and publishes to **https://michellefeliciano.github.io/tripnest/** on every push to `main`. One-time setup (already done):
+1. Repository must be **public** (free GitHub plans only serve Pages from public repos).
+2. Settings -> Pages -> Source: **GitHub Actions**.
+3. Settings -> Secrets and variables -> Actions -> **Variables**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (public values; never put a service_role key here).
+4. Supabase -> Authentication -> URL Configuration: Site URL `https://michellefeliciano.github.io/tripnest/`; add `https://michellefeliciano.github.io/tripnest/**` to Redirect URLs (keep `http://localhost:5173/**` for development).
+
+Notes: Pages has no SPA fallback, so the workflow copies `index.html` to `404.html` so links like `/tripnest/invite/<token>` still open the app. Invitation, sign-up and reset links are built with the sub-path automatically (`src/lib/appUrl.ts`).
+
+## Install on a phone
+iPhone (Safari): Share -> Add to Home Screen. Android (Chrome): menu -> Install app / Add to Home screen.

@@ -50,7 +50,7 @@ npm run build     # typecheck + production build
 Tests cover trips/date validation, roles, time zones, itinerary ordering/conflicts, packing, budgets, search, every split method and rounding, balances, settlements, ICS output, and ~50 row-level-security assertions against the real migrations in an in-process Postgres (PGlite). See [docs/QA_REPORT.md](docs/QA_REPORT.md) for what was and wasn't verified.
 
 ## Deployment
-Static host for `dist/` + Supabase. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Live at https://michellefeliciano.github.io/tripnest/ (GitHub Pages, deployed by Actions on every push to main; the tests must pass first). Works on phones and can be added to the home screen. Any static host also works. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Docs
 [Architecture](docs/ARCHITECTURE.md) Â· [Database](docs/DATABASE.md) Â· [Expense logic](docs/EXPENSE_LOGIC.md) Â· [Security](docs/SECURITY.md) Â· [API](docs/API.md) Â· [Deployment](docs/DEPLOYMENT.md) Â· [QA report](docs/QA_REPORT.md)
