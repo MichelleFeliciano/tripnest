@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { members as api } from '../../api/api';
 import { useTrip } from '../../hooks/contexts';
+import { appUrl } from '../../lib/appUrl';
 import { useAction } from '../../hooks/hooks';
 import { Alert, ErrorBanner, Field } from '../../components/ui';
 
@@ -18,7 +19,7 @@ export default function Members() {
     setLink(null);
     setCopied(false);
     const token = await run(() => api.invite(data.trip.id, email, role));
-    if (token) { setLink({ email, url: `${window.location.origin}/invite/${token}` }); setEmail(''); await reload(); }
+    if (token) { setLink({ email, url: appUrl(`invite/${token}`) }); setEmail(''); await reload(); }
   };
   const copy = async () => {
     if (!link) return;

@@ -6,6 +6,7 @@ import type {
 import type { Role } from '../lib/permissions';
 import type { SplitMethod } from '../lib/splits';
 import { expandTemplate, type PackingTemplate } from '../lib/packing';
+import { appUrl } from '../lib/appUrl';
 
 export class ApiError extends Error {
   constructor(message: string, readonly offline = false) {
@@ -53,7 +54,7 @@ export function clean<T extends Record<string, unknown>>(o: T): T {
 // ───────── auth & profile ─────────
 export const auth = {
   signUp: async (email: string, password: string, displayName: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: displayName }, emailRedirectTo: window.location.origin } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: displayName }, emailRedirectTo: appUrl() } });
     if (error) throw friendly(error);
     return data;
   },
@@ -66,7 +67,7 @@ export const auth = {
     await supabase.auth.signOut();
   },
   resetPassword: async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: appUrl('reset-password') });
     if (error) throw friendly(error);
   },
   updatePassword: async (password: string) => {
