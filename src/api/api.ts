@@ -94,7 +94,15 @@ export const trips = {
     return row;
   },
   update: (id: string, patch: Partial<Trip>) => run(supabase.from('trips').update(clean(patch)).eq('id', id)),
-  remove: (id: string) => run(supabase.from('trips').delete().eq('id', id)),
+  /** Deletes the trip and its uploaded files (rows cascade in the database, but storage files do not). */
+  remove: async (id: string) => {
+    const docs = await run<{ storage_path: string }[]>(supabase.from('documents').select('storage_path').eq('trip_id', id));
+    for (let i = 0; i < docs.length; i += 100) {
+      const { error } = await supabase.storage.from('trip-documents').remove(docs.slice(i, i + 100).map((d) => d.storage_path));
+      if (error) throw friendly(error); // stop before deleting the trip so nothing is orphaned
+    }
+    await run(supabase.from('trips').delete().eq('id', id));
+  },
 };
 
 // ───────── trip bundle (single load; also cached for poor connections) ─────────
