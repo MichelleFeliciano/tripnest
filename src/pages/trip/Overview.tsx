@@ -55,6 +55,7 @@ export default function Overview() {
 
       {can('itinerary.edit') && (
         <div className="row no-print" style={{ marginBottom: 16 }} role="group" aria-label="Quick actions">
+          <Link className="btn" to={`${base}/explore`}>🧭 Explore things to do</Link>
           <Link className="btn" to={`${base}/itinerary?new=1`}>+ Itinerary item</Link>
           <Link className="btn" to={`${base}/reservations?new=1`}>+ Reservation</Link>
           <Link className="btn" to={`${base}/expenses?new=1`}>+ Expense</Link>

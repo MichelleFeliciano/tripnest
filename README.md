@@ -14,6 +14,7 @@ A collaborative trip planner: itinerary, reservations, packing, shared expenses 
 - **Budgets**: total and per category, under/near/over with gentle wording.
 - **Collaboration**: Owner / Editor / Viewer roles, expiring single-use invitation links.
 - **Documents** in private storage via 60-second signed links.
+- **Explore**: find sights, museums, food, beaches and activities near each destination (OpenStreetMap data, no API key; looked up only when you press Search, results cached on-device for 24 h) and add any place to a chosen day with one click.
 - **Map** (OpenStreetMap, optional, with a list fallback), **search**, **printable booklet / PDF**, **.ics calendar export**.
 - **Optional AI** (itinerary ideas, packing suggestions, summary) that only runs when you click, never edits anything without confirmation, and is never used for calculations.
 

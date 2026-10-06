@@ -53,6 +53,9 @@ From the final QA review, fixed with regression tests:
 18. `is_member_of` allowed a membership oracle. Execution revoked.
 20. `apportion` could exceed 2^53 near the old cap. Cap lowered to 1e11 minor units (client and DB).
 
+## Explore (added after the QA review)
+Query building, parsing, junk filtering, ranking and link safety are unit-tested (`tests/explore.test.ts`). Checked live: geocoding San Juan and fetching 40 sights from Overpass worked; survey-marker junk found in the first live run was filtered. Limits: OpenStreetMap coverage and tagging quality vary by area; the geocoded centre of a city may be its municipal centre rather than the tourist core (use *Another place* or save precise coordinates); the free public Overpass service can be slow or rate-limited.
+
 ## Known limitations / not fixed
 - Removing a member with an unsettled balance is allowed; their name shows as "Former traveler" and the debt can be settled, but they can't be added to new splits and editing an old expense that includes them redistributes by current members only (finding #3, partial).
 - Reservation date without time is stored as 00:00 local and displays "12:00 AM" (#12). An end time without a date is ignored.

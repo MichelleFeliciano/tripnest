@@ -22,7 +22,7 @@ The browser holds only the Supabase **anon** key. All authorization is enforced 
 ## Known gaps / operator responsibilities
 - **Enable email confirmation** in Supabase Auth; invitation matching trusts the JWT email.
 - Edge-function CORS is `*` (it still requires a valid JWT). Restrict to your origin in production.
-- Add a Content-Security-Policy header at the host (map tiles need `img-src tile.openstreetmap.org`; Nominatim needs `connect-src nominatim.openstreetmap.org`).
+- Add a Content-Security-Policy header at the host (map tiles need `img-src tile.openstreetmap.org`; Nominatim needs `connect-src nominatim.openstreetmap.org`; Explore needs `connect-src overpass-api.de`). Explore only sends coordinates and a fixed category query to these public services, never trip or personal data.
 - The invitation link is shared by the inviter manually; email delivery is not built.
 - No MFA/audit log in the MVP. Supabase's own auth rate limits apply to sign-in and reset.
 - The local cache (`localStorage`) holds the last viewed trip on that device; it's cleared at log out but not encrypted.

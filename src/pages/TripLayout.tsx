@@ -4,7 +4,7 @@ import { Alert, Spinner, StatusBadge } from '../components/ui';
 import { formatDateRange, tripDuration } from '../lib/trip';
 
 const TABS: [string, string][] = [
-  ['', 'Overview'], ['itinerary', 'Itinerary'], ['reservations', 'Reservations'], ['details', 'Travel details'], ['packing', 'Packing'],
+  ['', 'Overview'], ['itinerary', 'Itinerary'], ['explore', 'Explore'], ['reservations', 'Reservations'], ['details', 'Travel details'], ['packing', 'Packing'],
   ['expenses', 'Expenses'], ['budget', 'Budget'], ['notes', 'Notes'], ['documents', 'Documents'], ['members', 'Members'],
   ['map', 'Map'], ['search', 'Search'], ['export', 'Export'], ['settings', 'Settings'],
 ];

@@ -22,6 +22,7 @@ const Budget = lazy(() => import('./pages/trip/Budget'));
 const Notes = lazy(() => import('./pages/trip/Notes'));
 const Documents = lazy(() => import('./pages/trip/Documents'));
 const Members = lazy(() => import('./pages/trip/Members'));
+const Explore = lazy(() => import('./pages/trip/Explore'));
 const MapPage = lazy(() => import('./pages/trip/MapPage'));
 const SearchPage = lazy(() => import('./pages/trip/SearchPage'));
 const Export = lazy(() => import('./pages/trip/Export'));
@@ -98,6 +99,7 @@ export default function App() {
               <Route path="notes" element={<Notes />} />
               <Route path="documents" element={<Documents />} />
               <Route path="members" element={<Members />} />
+              <Route path="explore" element={<Explore />} />
               <Route path="map" element={<MapPage />} />
               <Route path="search" element={<SearchPage />} />
               <Route path="export" element={<Export />} />
