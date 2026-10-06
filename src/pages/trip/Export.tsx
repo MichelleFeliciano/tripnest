@@ -78,11 +78,11 @@ export default function Export() {
           <h2>Expense summary</h2>
           <p>Total: {Object.entries(totals).map(([c, v]) => formatMoney(v, c)).join(' · ') || '—'}{Object.keys(totals).length > 1 && ` (${NO_CONVERSION_NOTICE})`}</p>
           {data.expenses.length > 0 && (
-            <table>
+            <div className="table-wrap"><table>
               <caption className="sr-only">Expenses</caption>
               <thead><tr><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Paid by</th><th scope="col" className="num">Amount</th></tr></thead>
               <tbody>{data.expenses.map((e) => <tr key={e.id}><td>{e.expense_date}</td><td>{e.description}</td><td>{nameOf(data, e.paid_by)}</td><td className="num">{formatMoney(e.amount_cents, e.currency)}</td></tr>)}</tbody>
-            </table>
+            </table></div>
           )}
           <h3>Who owes whom</h3>
           {transfers.length === 0 ? <p>Everyone is settled up.</p> : <ul>{transfers.map((t, i) => <li key={i}>{nameOf(data, t.from)} → {nameOf(data, t.to)}: {formatMoney(t.amountCents, t.currency)}</li>)}</ul>}

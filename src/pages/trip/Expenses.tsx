@@ -156,16 +156,19 @@ export default function Expenses() {
           <div className="table-wrap">
             <table>
               <caption className="sr-only">Shared expenses</caption>
-              <thead><tr><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Paid by</th><th scope="col" className="num">Amount</th><th scope="col">Split</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Paid by</th><th scope="col" className="num">Amount</th><th scope="col" className="hide-mobile">Split</th></tr></thead>
               <tbody>
                 {exps.map((e) => (
                   <tr key={e.id}>
-                    <td>{formatDateShort(e.expense_date)}</td>
-                    <td><strong>{e.description}</strong><div className="muted">{e.category}{e.notes ? ` · ${e.notes}` : ''}</div></td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{formatDateShort(e.expense_date)}</td>
+                    <td>
+                      <strong>{e.description}</strong>
+                      <div className="muted">{e.category}{e.notes ? ` · ${e.notes}` : ''}</div>
+                      {canModifyExpense(data.role, e.created_by, me) && <div className="row" style={{ marginTop: 6 }}><button className="btn btn-sm" onClick={() => open(e)} aria-label={`Edit ${e.description}`}>Edit</button><button className="btn btn-sm btn-danger" onClick={() => remove(e)} aria-label={`Delete ${e.description}`}>Delete</button></div>}
+                    </td>
                     <td>{nameOf(data, e.paid_by)}</td>
                     <td className="num">{formatMoney(e.amount_cents, e.currency)}</td>
-                    <td className="muted">{e.expense_splits.map((s) => `${nameOf(data, s.user_id)} ${formatMoney(s.amount_cents, e.currency)}`).join(', ')}</td>
-                    <td>{canModifyExpense(data.role, e.created_by, me) && <div className="row"><button className="btn btn-sm" onClick={() => open(e)} aria-label={`Edit ${e.description}`}>Edit</button><button className="btn btn-sm btn-danger" onClick={() => remove(e)} aria-label={`Delete ${e.description}`}>Delete</button></div>}</td>
+                    <td className="muted hide-mobile">{e.expense_splits.map((s) => `${nameOf(data, s.user_id)} ${formatMoney(s.amount_cents, e.currency)}`).join(', ')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -180,8 +183,8 @@ export default function Expenses() {
           <div className="table-wrap">
             <table>
               <caption className="sr-only">Recorded payments between travelers</caption>
-              <thead><tr><th scope="col">Date</th><th scope="col">Paid by</th><th scope="col">Received by</th><th scope="col" className="num">Amount</th><th scope="col">Note</th></tr></thead>
-              <tbody>{data.settlements.map((s) => <tr key={s.id}><td>{formatDateShort(s.settled_on)}</td><td>{nameOf(data, s.from_user)}</td><td>{nameOf(data, s.to_user)}</td><td className="num">{formatMoney(s.amount_cents, s.currency)}</td><td>{s.note}</td></tr>)}</tbody>
+              <thead><tr><th scope="col">Date</th><th scope="col">Paid by</th><th scope="col">Received by</th><th scope="col" className="num">Amount</th><th scope="col" className="hide-mobile">Note</th></tr></thead>
+              <tbody>{data.settlements.map((s) => <tr key={s.id}><td style={{ whiteSpace: 'nowrap' }}>{formatDateShort(s.settled_on)}</td><td>{nameOf(data, s.from_user)}</td><td>{nameOf(data, s.to_user)}</td><td className="num" style={{ whiteSpace: 'nowrap' }}>{formatMoney(s.amount_cents, s.currency)}{s.note && <div className="muted" style={{ fontSize: '.8rem' }}>{s.note}</div>}</td><td className="hide-mobile">{s.note}</td></tr>)}</tbody>
             </table>
           </div>
           <p className="muted">This is a record only. TripNest never moves money. Entries can't be edited; record a correction instead.</p>

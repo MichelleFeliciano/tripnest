@@ -107,11 +107,22 @@ legend { font-weight: 600; padding: 0 6px; }
 .list { list-style: none; margin: 0; padding: 0; }
 .list > li { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .list > li:last-child { border-bottom: 0; }
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; position: relative; /* contains the absolutely-positioned .sr-only cells so they cannot widen the page */ }
+summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
 th { font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.num { white-space: nowrap; }
+@media (min-width: 720px) { td.num .muted { display: none; } } /* the note has its own column on wide screens */
+@media (max-width: 719px) { th, td { padding: 8px 6px; } }
+@media (max-width: 360px) { /* very small phones */
+  .container { padding-inline: 10px; }
+  .card { padding: 12px; }
+  table { font-size: .88rem; }
+  th, td { padding: 8px 3px; }
+  th { font-size: .7rem; letter-spacing: 0; }
+}
 caption { text-align: left; font-weight: 700; padding: 0 0 8px; }
 
 /* itinerary */
@@ -127,8 +138,8 @@ caption { text-align: left; font-weight: 700; padding: 0 0 8px; }
 .cal button[aria-pressed='true'] { background: var(--brand); color: var(--brand-ink); }
 .cal button:disabled { opacity: .35; cursor: default; }
 .cal .count { font-size: .7rem; font-weight: 700; }
-.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.seg button { border: 0; background: var(--surface); color: var(--text); min-height: 40px; padding: 0 14px; font: inherit; font-weight: 600; cursor: pointer; }
+.seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.seg button { flex: 1 1 auto; border: 0; background: var(--surface); color: var(--text); min-height: 40px; padding: 0 14px; font: inherit; font-weight: 600; cursor: pointer; }
 .seg button[aria-pressed='true'] { background: var(--brand); color: var(--brand-ink); }
 .map { height: 380px; border-radius: var(--radius); border: 1px solid var(--border); }
 .pack-item { display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--border); }

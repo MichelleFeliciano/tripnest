@@ -1,4 +1,4 @@
-﻿# TripNest
+# TripNest
 
 A collaborative trip planner: itinerary, reservations, packing, shared expenses with fair splitting, budgets, notes, private documents, maps and calendar export, all in one place and built mobile-first.
 
@@ -54,3 +54,6 @@ Live at https://michellefeliciano.github.io/tripnest/ (GitHub Pages, deployed by
 
 ## Docs
 [Architecture](docs/ARCHITECTURE.md) Â· [Database](docs/DATABASE.md) Â· [Expense logic](docs/EXPENSE_LOGIC.md) Â· [Security](docs/SECURITY.md) Â· [API](docs/API.md) Â· [Deployment](docs/DEPLOYMENT.md) Â· [QA report](docs/QA_REPORT.md)
+
+### UI checks (phone layout and accessibility)
+`npm run test:e2e` runs the real app in Microsoft Edge against a fake local backend with sample data (it never touches your Supabase project). It visits every screen at 375 px, 320 px and desktop widths and fails on sideways scrolling, elements sticking out, tap targets under 32 px, console errors, and serious accessibility problems (axe, WCAG 2.2 AA). Screenshots land in `tests/e2e/.artifacts/shots/` for eyeballing.

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/contexts';
 import { isConfigured } from './api/supabase';
@@ -70,7 +70,39 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   return children;
 }
 
+/**
+ * Tables that scroll sideways must be reachable by keyboard (WCAG 2.1.1). Make a .table-wrap focusable
+ * only while it actually overflows, and label it, so wide screens get no pointless extra tab stops.
+ */
+function useScrollableTablesFocusable() {
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        document.querySelectorAll<HTMLElement>('.table-wrap').forEach((el) => {
+          if (el.scrollWidth > el.clientWidth + 1) {
+            el.tabIndex = 0;
+            el.setAttribute('role', 'region');
+            el.setAttribute('aria-label', `${el.querySelector('caption')?.textContent?.trim() || 'Table'} (scrolls sideways)`);
+          } else {
+            el.removeAttribute('tabindex');
+            el.removeAttribute('role');
+            el.removeAttribute('aria-label');
+          }
+        });
+      });
+    };
+    update();
+    const mo = new MutationObserver(update);
+    mo.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', update);
+    return () => { mo.disconnect(); window.removeEventListener('resize', update); cancelAnimationFrame(frame); };
+  }, []);
+}
+
 export default function App() {
+  useScrollableTablesFocusable();
   const online = useOnline();
   if (!isConfigured) return <SetupScreen />;
   return (
