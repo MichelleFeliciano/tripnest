@@ -247,6 +247,30 @@ export const documents = {
   },
 };
 
+// ───────── account deletion ─────────
+export interface AccountPreview {
+  owned_with_others: { id: string; name: string; members: number }[];
+  owned_solo: { id: string; name: string }[];
+  shared_trips: number;
+  shared_expenses: number;
+}
+export const account = {
+  preview: () => run<AccountPreview>(supabase.rpc('account_deletion_preview')),
+  /** Removes stored files of trips only you were on, then deletes the account. Irreversible. */
+  remove: async (soloTripIds: string[]) => {
+    if (soloTripIds.length) {
+      const docs = await run<{ storage_path: string }[]>(supabase.from('documents').select('storage_path').in('trip_id', soloTripIds));
+      for (let i = 0; i < docs.length; i += 100) {
+        const { error } = await supabase.storage.from('trip-documents').remove(docs.slice(i, i + 100).map((d) => d.storage_path));
+        if (error) throw friendly(error); // stop before deleting anything else
+      }
+    }
+    await run(supabase.rpc('delete_my_account'));
+    clearCaches();
+    await supabase.auth.signOut({ scope: 'local' });
+  },
+};
+
 // ───────── optional AI (explicit user action only) ─────────
 export const ai = {
   ask: async (tripId: string, kind: 'itinerary' | 'packing' | 'summary', input: Record<string, unknown>) => {

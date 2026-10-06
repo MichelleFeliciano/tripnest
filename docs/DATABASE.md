@@ -31,3 +31,6 @@ PostgreSQL (Supabase). Migrations live in `supabase/migrations/` and are applied
 
 ## Setup
 1. Create a Supabase project. 2. In the SQL editor (or `supabase db push`), run `0001_schema.sql`, `0002_security.sql`, `0003_storage.sql` in order. 3. Auth settings: enable **email confirmations**, set the Site URL to your app URL, and add `<app-url>/reset-password` to redirect URLs.
+
+## Migration 0004: account deletion
+Adds the placeholder user `00000000-0000-0000-0000-00000000dead` ("Former traveler", banned, never a member) and the functions `account_deletion_preview()` and `delete_my_account()`. Run it after 0001-0003 (existing projects: paste just this file).

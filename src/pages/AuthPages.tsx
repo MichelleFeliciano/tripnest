@@ -13,6 +13,7 @@ export function LoginPage() {
   const loc = useLocation();
   const nav = useNavigate();
   const from = (loc.state as { from?: string } | null)?.from;
+  const deleted = new URLSearchParams(loc.search).get('deleted') === '1';
   const [mode, setMode] = useState<Mode>('in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,6 +47,7 @@ export function LoginPage() {
       <h1>{titles[mode]}</h1>
       <form className="card" onSubmit={submit} noValidate={false}>
         <ErrorBanner message={error} />
+        {deleted && !notice && <Alert kind="success">Your account has been deleted.</Alert>}
         {notice && <Alert kind="success">{notice}</Alert>}
         {mode === 'up' && (
           <Field label="Your name">{(id) => <input id={id} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required maxLength={80} />}</Field>

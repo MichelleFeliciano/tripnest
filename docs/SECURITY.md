@@ -26,3 +26,6 @@ The browser holds only the Supabase **anon** key. All authorization is enforced 
 - The invitation link is shared by the inviter manually; email delivery is not built.
 - No MFA/audit log in the MVP. Supabase's own auth rate limits apply to sign-in and reset.
 - The local cache (`localStorage`) holds the last viewed trip on that device; it's cleared at log out but not encrypted.
+
+## Account deletion
+`delete_my_account()` (SECURITY DEFINER, acts only on `auth.uid()`) is the only way to delete an account; browsers cannot call the Auth admin API. It refuses while the user owns a trip other people have joined. Otherwise it deletes trips only that user was on (the app removes their stored files first), re-attributes their expenses, splits, payments and uploads to a non-login placeholder "Former traveler" so other people's balances never change, then deletes the auth user (cascading their profile, memberships and personal packing lists). The UI requires typing the account email after a preview of exactly what will happen. Covered by `tests/account-deletion.test.ts`.

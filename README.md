@@ -1,11 +1,11 @@
-# TripNest
+﻿# TripNest
 
 A collaborative trip planner: itinerary, reservations, packing, shared expenses with fair splitting, budgets, notes, private documents, maps and calendar export, all in one place and built mobile-first.
 
-**Workflow:** Create trip → invite travelers → build itinerary → add reservations → pack → track shared expenses → split costs → complete the trip.
+**Workflow:** Create trip â†’ invite travelers â†’ build itinerary â†’ add reservations â†’ pack â†’ track shared expenses â†’ split costs â†’ complete the trip.
 
 ## Features
-- **Accounts**: sign up, log in/out, password reset, profile. People see only trips they own or were invited to.
+- **Accounts**: sign up, log in/out, password reset, profile. Self-service account deletion with a clear preview of what is removed and what is kept. People see only trips they own or were invited to.
 - **Trips**: dates validated (days/nights calculated), status (Planning/Upcoming/In Progress/Completed/Archived), destinations, notes, dashboard with today's plan, next item, expenses, packing progress and quick actions.
 - **Itinerary** with times in the **local time zone of each place** (a flight can leave Chicago and land in Puerto Rico). Timeline, month calendar, week and day views, schedule-conflict warnings.
 - **Reservations & travel details**: flights, hotels, restaurants, activities, rental cars, contacts. Flexible fields and a quick-access page of confirmation numbers.
@@ -19,7 +19,7 @@ A collaborative trip planner: itinerary, reservations, packing, shared expenses 
 - **Optional AI** (itinerary ideas, packing suggestions, summary) that only runs when you click, never edits anything without confirmation, and is never used for calculations.
 
 ## Stack
-React 18 + TypeScript + Vite (plain CSS) · Supabase (Postgres, Auth, Storage, RLS, Edge Function) · Leaflet/OpenStreetMap · Vitest. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+React 18 + TypeScript + Vite (plain CSS) Â· Supabase (Postgres, Auth, Storage, RLS, Edge Function) Â· Leaflet/OpenStreetMap Â· Vitest. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Local development
 ```bash
@@ -40,7 +40,7 @@ You need a Supabase project (free) with the migrations applied. See *Database se
 Never commit `.env`; only `.env.example` is tracked.
 
 ## Database setup
-Run `supabase/migrations/0001_schema.sql`, `0002_security.sql`, `0003_storage.sql` in order, enable email confirmation and set redirect URLs. Details: [docs/DATABASE.md](docs/DATABASE.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Run `supabase/migrations/0001_schema.sql`, `0002_security.sql`, `0003_storage.sql`, `0004_delete_account.sql` in order (or paste `supabase/setup-all.sql`), enable email confirmation and set redirect URLs. Details: [docs/DATABASE.md](docs/DATABASE.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Testing
 ```bash
@@ -53,4 +53,4 @@ Tests cover trips/date validation, roles, time zones, itinerary ordering/conflic
 Static host for `dist/` + Supabase. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Docs
-[Architecture](docs/ARCHITECTURE.md) · [Database](docs/DATABASE.md) · [Expense logic](docs/EXPENSE_LOGIC.md) · [Security](docs/SECURITY.md) · [API](docs/API.md) · [Deployment](docs/DEPLOYMENT.md) · [QA report](docs/QA_REPORT.md)
+[Architecture](docs/ARCHITECTURE.md) Â· [Database](docs/DATABASE.md) Â· [Expense logic](docs/EXPENSE_LOGIC.md) Â· [Security](docs/SECURITY.md) Â· [API](docs/API.md) Â· [Deployment](docs/DEPLOYMENT.md) Â· [QA report](docs/QA_REPORT.md)

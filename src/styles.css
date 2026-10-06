@@ -58,7 +58,7 @@ p { margin: .25rem 0 .75rem; }
   .tabbar .ico { font-size: 1.3rem; }
   .hide-mobile { display: none; }
 }
-@media (min-width: 720px) { .only-mobile { display: none; } }
+@media (min-width: 720px) { .only-mobile, .btn.only-mobile { display: none; } }
 
 /* controls */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; padding: .5rem 1rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }

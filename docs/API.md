@@ -39,3 +39,9 @@ Bucket `trip-documents` (private). Upload to `<trip_id>/<uuid>-<name>`; read via
 
 ## Integration notes
 All entities use UUID primary keys and `updated_at`, so external systems (budget app, calendar, meal planner) can reference trips and items stably. Calendar export is generated client-side (`src/lib/ics.ts`).
+
+## Account deletion RPC
+| Function | Returns |
+|---|---|
+| `account_deletion_preview` | `{owned_with_others[], owned_solo[], shared_trips, shared_expenses}` |
+| `delete_my_account` | nothing; raises if you still own trips others have joined |
