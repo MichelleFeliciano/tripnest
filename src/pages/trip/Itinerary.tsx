@@ -16,7 +16,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export default function Itinerary() {
-  const { data, can } = useTrip();
+  const { data } = useTrip();
   const [sp, setSp] = useSearchParams();
   const { trip } = data;
   const dates = useMemo(() => tripDates(trip.start_date, trip.end_date), [trip]);
@@ -34,16 +34,15 @@ export default function Itinerary() {
   const setView = (v: View, d?: string) => setSp((p) => { const n = new URLSearchParams(p); n.set('view', v); if (d) n.set('date', d); n.delete('new'); return n; }, { replace: true });
   const openNew = () => setForm({ open: true, editing: null });
   const edit = (i: ItineraryRow) => setForm({ open: true, editing: i });
-  const close = () => { setForm({ open: false, editing: null }); setSp((p) => { const n = new URLSearchParams(p); n.delete('new'); return n; }, { replace: true }); };
-  const canEdit = can('itinerary.edit');
+  const close = () => { setForm({ open: false, editing: null }); setSp((p) => { const n = new URLSearchParams(p); n.delete('new'); return n; }, { replace: true }); };
 
   const Day = ({ d }: { d: string }) => {
     const items = byDay.get(d) ?? [];
     return (
       <section aria-labelledby={`day-${d}`}>
         <h2 id={`day-${d}`} className="day-head">Day {dayIndex(trip.start_date, d)} · {formatDateLong(d)}</h2>
-        {items.length === 0 ? <p className="muted">Nothing planned yet.{canEdit && <> <button className="btn btn-sm" onClick={() => { setSp((p) => { const n = new URLSearchParams(p); n.set('date', d); return n; }, { replace: true }); openNew(); }}>Add something</button></>}</p> : (
-          <ul className="list">{items.map((i) => <ItemRow key={i.id} item={rowOf(i.id)} conflict={conflictFor(i.id)} canEdit={canEdit} onEdit={edit} />)}</ul>
+        {items.length === 0 ? <p className="muted">Nothing planned yet.{<> <button className="btn btn-sm" onClick={() => { setSp((p) => { const n = new URLSearchParams(p); n.set('date', d); return n; }, { replace: true }); openNew(); }}>Add something</button></>}</p> : (
+          <ul className="list">{items.map((i) => <ItemRow key={i.id} item={rowOf(i.id)} conflict={conflictFor(i.id)} canEdit onEdit={edit} />)}</ul>
         )}
       </section>
     );
@@ -65,11 +64,11 @@ export default function Itinerary() {
         <div className="seg" role="group" aria-label="Itinerary view">
           {VIEWS.map(([v, label]) => <button key={v} aria-pressed={view === v} onClick={() => setView(v, v === 'timeline' ? undefined : date)}>{label}</button>)}
         </div>
-        {canEdit && <button className="btn btn-primary" onClick={openNew}>+ Add item</button>}
+        {<button className="btn btn-primary" onClick={openNew}>+ Add item</button>}
       </div>
 
       {conflicts.length > 0 && <Alert kind="warn">{conflicts.length} possible schedule {conflicts.length === 1 ? 'overlap' : 'overlaps'} found. They're highlighted below. Nothing was changed.</Alert>}
-      {data.items.length === 0 && <Empty title="Your itinerary is empty">{canEdit ? 'Add a flight, hotel check-in or dinner to get started.' : 'Nothing has been added yet.'}</Empty>}
+      {data.items.length === 0 && <Empty title="Your itinerary is empty">{'Add a flight, hotel check-in or dinner to get started.'}</Empty>}
 
       {view === 'timeline' && data.items.length > 0 && dates.map((d) => <Day key={d} d={d} />)}
       {view === 'timeline' && outside.map((d) => <Day key={d} d={d} />)}

@@ -43,7 +43,7 @@ export async function findPlaces(cat: ExploreCategory, lat: number, lng: number,
     return { places, cached: false };
   } catch (e) {
     if (e instanceof ApiError) throw e;
-    throw new ApiError("Couldn't load suggestions. Check your connection and try again. The rest of TripNest still works.", true);
+    throw new ApiError("Couldn't load suggestions. Check your connection and try again. The rest of TripNest still works.");
   } finally {
     clearTimeout(timer);
   }

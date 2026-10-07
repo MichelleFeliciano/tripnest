@@ -62,7 +62,7 @@ export function ReservationCard({ r, onEdit }: { r: Reservation; onEdit?: (r: Re
 }
 
 export default function Reservations() {
-  const { data, reload, can } = useTrip();
+  const { data, reload } = useTrip();
   const [sp, setSp] = useSearchParams();
   const tz0 = data.items.find((i) => i.start_tz)?.start_tz ?? browserTimeZone();
   const blank = (): F => ({ kind: 'hotel', title: '', provider: '', confirmation_number: '', s_date: '', s_time: '', s_tz: tz0, e_date: '', e_time: '', e_tz: tz0, website: '', phone: '', address: '', notes: '', itinerary_item_id: '', details: {} });
@@ -70,7 +70,6 @@ export default function Reservations() {
   const [f, setF] = useState<F>(blank);
   const [errs, setErrs] = useState<string[]>([]);
   const { busy, error, run } = useAction();
-  const canEdit = can('reservations.edit');
 
   const open = (r: Reservation | 'new') => {
     setErrs([]);
@@ -121,8 +120,8 @@ export default function Reservations() {
 
   return (
     <div>
-      <div className="row-between"><h2>Reservations</h2>{canEdit && <button className="btn btn-primary" onClick={() => open('new')}>+ Add reservation</button>}</div>
-      {sorted.length === 0 ? <Empty title="No reservations yet">Add flights, hotels, restaurants and activities with their confirmation numbers.</Empty> : sorted.map((r) => <ReservationCard key={r.id} r={r} onEdit={canEdit ? open : undefined} />)}
+      <div className="row-between"><h2>Reservations</h2>{<button className="btn btn-primary" onClick={() => open('new')}>+ Add reservation</button>}</div>
+      {sorted.length === 0 ? <Empty title="No reservations yet">Add flights, hotels, restaurants and activities with their confirmation numbers.</Empty> : sorted.map((r) => <ReservationCard key={r.id} r={r} onEdit={open} />)}
 
       <Dialog open={editing !== null} onClose={close} title={editing === 'new' ? 'Add reservation' : 'Edit reservation'}>
         <form onSubmit={submit}>

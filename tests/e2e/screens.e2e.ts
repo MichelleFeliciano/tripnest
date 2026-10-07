@@ -2,27 +2,26 @@
  * Visits every screen with sample data at phone and desktop sizes and checks:
  *  - nothing makes the page scroll sideways or sticks out of the viewport
  *  - buttons, inputs and links are big enough to tap (phones)
- *  - no console/page errors, no calls to a real Supabase host
+ *  - no console/page errors
  *  - automated accessibility scan (axe, WCAG 2.2 AA): fails on serious/critical issues
  * Screenshots go to tests/e2e/.artifacts/shots/<project>/ so they can be eyeballed.
  */
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { IDS, installMock } from './mock-supabase';
+import { seedSampleTrip } from './fixtures';
 
-const T = IDS.TRIP;
-const SCREENS: [string, string][] = [
-  ['trips-list', '/trips'], ['new-trip', '/trips/new'], ['profile', '/profile'],
-  ['overview', `/trips/${T}`], ['itinerary-timeline', `/trips/${T}/itinerary`], ['itinerary-month', `/trips/${T}/itinerary?view=month`],
-  ['itinerary-week', `/trips/${T}/itinerary?view=week`], ['itinerary-day', `/trips/${T}/itinerary?view=day`],
-  ['explore', `/trips/${T}/explore`], ['reservations', `/trips/${T}/reservations`], ['details', `/trips/${T}/details`],
-  ['packing', `/trips/${T}/packing`], ['expenses', `/trips/${T}/expenses`], ['budget', `/trips/${T}/budget`],
-  ['notes', `/trips/${T}/notes`], ['documents', `/trips/${T}/documents`], ['members', `/trips/${T}/members`],
-  ['map', `/trips/${T}/map`], ['search', `/trips/${T}/search`], ['export', `/trips/${T}/export`],
-  ['settings', `/trips/${T}/settings`], ['more', `/trips/${T}/more`],
+const SCREENS: [string, (t: string) => string][] = [
+  ['trips-list', () => '/trips'], ['new-trip', () => '/trips/new'], ['profile', () => '/profile'],
+  ['overview', (t) => `/trips/${t}`], ['itinerary-timeline', (t) => `/trips/${t}/itinerary`], ['itinerary-month', (t) => `/trips/${t}/itinerary?view=month`],
+  ['itinerary-week', (t) => `/trips/${t}/itinerary?view=week`], ['itinerary-day', (t) => `/trips/${t}/itinerary?view=day`],
+  ['explore', (t) => `/trips/${t}/explore`], ['reservations', (t) => `/trips/${t}/reservations`], ['details', (t) => `/trips/${t}/details`],
+  ['packing', (t) => `/trips/${t}/packing`], ['expenses', (t) => `/trips/${t}/expenses`], ['budget', (t) => `/trips/${t}/budget`],
+  ['notes', (t) => `/trips/${t}/notes`], ['documents', (t) => `/trips/${t}/documents`], ['travelers', (t) => `/trips/${t}/members`],
+  ['map', (t) => `/trips/${t}/map`], ['search', (t) => `/trips/${t}/search`], ['export', (t) => `/trips/${t}/export`],
+  ['settings', (t) => `/trips/${t}/settings`], ['more', (t) => `/trips/${t}/more`],
   // dialogs
-  ['dialog-add-itinerary', `/trips/${T}/itinerary?new=1`], ['dialog-add-expense', `/trips/${T}/expenses?new=1`],
-  ['dialog-add-reservation', `/trips/${T}/reservations?new=1`], ['dialog-add-packing', `/trips/${T}/packing?new=1`],
+  ['dialog-add-itinerary', (t) => `/trips/${t}/itinerary?new=1`], ['dialog-add-expense', (t) => `/trips/${t}/expenses?new=1`],
+  ['dialog-add-reservation', (t) => `/trips/${t}/reservations?new=1`], ['dialog-add-packing', (t) => `/trips/${t}/packing?new=1`],
 ];
 
 const isPhone = (name: string) => name.startsWith('phone');
@@ -54,18 +53,16 @@ async function layoutReport(page: Page) {
   });
 }
 
-for (const [name, path] of SCREENS) {
+for (const [name, pathOf] of SCREENS) {
   test(`${name}`, async ({ page }, info) => {
-    const mock = await installMock(page);
     const consoleErrors: string[] = [];
     page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`));
     page.on('console', (m) => {
       const t = m.text();
       if (m.type() === 'error' && !/Failed to load resource|ERR_FAILED|ERR_INTERNET|tile\.openstreetmap/.test(t)) consoleErrors.push(`console: ${t.slice(0, 160)}`);
     });
-    await page.route(/tile\.openstreetmap\.org|nominatim\.openstreetmap\.org|overpass-api\.de/, (r) => r.abort());
-
-    await page.goto(path);
+    const tripId = await seedSampleTrip(page);
+    await page.goto(pathOf(tripId));
     await page.waitForSelector('main h1, main h2', { timeout: 20_000 });
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(400);
@@ -77,7 +74,6 @@ for (const [name, path] of SCREENS) {
     issues.push(...lay.bad.map((b) => `sticks out: ${b}`));
     if (isPhone(info.project.name)) issues.push(...lay.small.map((s) => `tap target too small: ${s}`));
     issues.push(...consoleErrors);
-    if (mock.realHostCalls.length) issues.push(`called a REAL Supabase host: ${mock.realHostCalls[0]}`);
 
     const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).exclude('.leaflet-container').analyze();
     for (const v of axe.violations.filter((x) => x.impact === 'serious' || x.impact === 'critical')) {
@@ -91,24 +87,23 @@ for (const [name, path] of SCREENS) {
   });
 }
 
-test('login page (signed out)', async ({ page }, info) => {
-  const mock = await installMock(page, { signedIn: false });
-  await page.goto('/login');
+test('first run: empty trips page', async ({ page }, info) => {
+  await page.goto('/trips');
   await page.waitForSelector('main h1');
+  await expect(page.locator('main')).toContainText('No trips yet');
   const lay = await layoutReport(page);
   const issues: string[] = [];
   if (lay.scrollWidth > lay.vw + 1) issues.push(`page scrolls sideways (${lay.scrollWidth} > ${lay.vw})`);
   if (isPhone(info.project.name)) issues.push(...lay.small.map((s) => `tap target too small: ${s}`));
   const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   issues.push(...axe.violations.filter((x) => x.impact === 'serious' || x.impact === 'critical').map((v) => `a11y [${v.impact}] ${v.id}: ${v.help}`));
-  if (mock.realHostCalls.length) issues.push('called a REAL Supabase host');
-  await page.screenshot({ path: `tests/e2e/.artifacts/shots/${info.project.name}/login.png`, fullPage: true });
+  await page.screenshot({ path: `tests/e2e/.artifacts/shots/${info.project.name}/first-run.png`, fullPage: true });
   expect(issues, issues.join('\n')).toEqual([]);
 });
 
 test('phone navigation: bottom tab bar reaches the key screens in one tap', async ({ page }, info) => {
   test.skip(!isPhone(info.project.name), 'phone only');
-  await installMock(page);
+  const T = await seedSampleTrip(page);
   await page.goto(`/trips/${T}`);
   await page.waitForSelector('main h1');
   const bar = page.getByRole('navigation', { name: 'Trip sections' }).last();
@@ -121,7 +116,7 @@ test('phone navigation: bottom tab bar reaches the key screens in one tap', asyn
 
 test('phone: money tables show every amount without sideways scrolling', async ({ page }, info) => {
   test.skip(!isPhone(info.project.name), 'phone only');
-  await installMock(page);
+  const T = await seedSampleTrip(page);
   await page.goto(`/trips/${T}/expenses`);
   await page.waitForSelector('#list-h');
   const r = await page.evaluate(() => {
@@ -136,7 +131,7 @@ test('phone: money tables show every amount without sideways scrolling', async (
 
 test('phone: today, hotel, reservation numbers, packing, expense and balances are reachable with minimal navigation', async ({ page }, info) => {
   test.skip(!isPhone(info.project.name), 'phone only');
-  await installMock(page);
+  const T = await seedSampleTrip(page);
   await page.goto(`/trips/${T}`);
   await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
   await page.goto(`/trips/${T}/details`);

@@ -3,7 +3,7 @@
 All of this is deterministic code in `src/lib/{money,splits,balances,budget}.ts`. **No AI is involved in any calculation.**
 
 ## Representation
-Money is an integer number of *minor units* (`amount_cents`): cents for USD, whole yen for JPY (exponent 0), 3 decimals for BHD/KWD, default exponent 2. Floats never take part in arithmetic. Decimal text is parsed with string operations (`parseMoney`), so `"0.29"` is exactly `29`. Parsing rejects negatives, junk, more decimals than the currency allows, and absurd magnitudes (> 10^11 minor units). The database stores `bigint` with `CHECK (amount_cents > 0)`.
+Money is an integer number of *minor units* (`amount_cents`): cents for USD, whole yen for JPY (exponent 0), 3 decimals for BHD/KWD, default exponent 2. Floats never take part in arithmetic. Decimal text is parsed with string operations (`parseMoney`), so `"0.29"` is exactly `29`. Parsing rejects negatives, junk, more decimals than the currency allows, and absurd magnitudes (> 10^11 minor units). Stored amounts must be integers of at least 1 (payments and splits may be 0 or more).
 
 ## Splitting (`computeSplits`)
 Every method returns amounts that sum **exactly** to the total, or throws.
@@ -20,9 +20,9 @@ Every method returns amounts that sum **exactly** to the total, or throws.
 Also rejected: empty participant list, duplicate participants, non-integer or non-positive totals.
 
 ### Enforcement beyond the UI
-1. `save_expense` (Postgres function) re-validates membership of payer and every participant, non-negative splits, and `sum(splits) = amount`, inside one transaction.
-2. A **deferred constraint trigger** re-checks `sum(splits) = amount` at commit, for any writer.
-3. Direct `INSERT/UPDATE` on `expenses`, `expense_splits` and `settlements` is revoked from clients.
+1. `expenses.save` (in `src/api/api.ts`) re-validates on every save, inside one storage transaction: the payer and everyone in the split are travelers on that trip, no duplicates, no negative amounts, and `sum(splits) = amount`. A failed save changes nothing.
+2. Backup and trip files are checked the same way when opened (every expense's splits must add up), so a damaged or hand-edited file cannot introduce an unbalanced expense.
+3. The tests in `tests/store.test.ts` cover rejected saves, edits that replace the splits atomically, and balances after partial payments.
 
 ## Balances (`computeNetBalances`)
 For each currency and person: `net = paid − owed`, where `owed` is that person's split amount.
@@ -38,7 +38,7 @@ Example: M owes J $20, J owes F $30, F owes M $10 gives nets M −10, J −10, F
 This is not guaranteed to be the global minimum (that problem is NP-hard in general), but it is optimal-or-near for trip-sized groups and easy to explain.
 
 ## Recording payments
-"Mark as paid" calls `record_settlement` and appends a row (who paid, who received, amount, currency, date, optional note). Partial payments are allowed; an overpayment flips the direction. The ledger is append-only: no update or delete is possible for clients, so history is never silently altered. To correct a mistake, record an opposite entry. No money moves through TripNest.
+"Mark as paid" records a payment (who paid, who received, amount, currency, date, optional note). Partial payments are allowed; an overpayment flips the direction. Payments are a ledger entry only: no money moves through TripNest. Because there is one person using each device, a mistaken entry can simply be deleted (with confirmation) and recorded again; deleting an expense never touches payments.
 Deleting an expense changes balances going forward but does not touch settlement rows.
 
 ## Currencies

@@ -46,6 +46,12 @@ export function tripDuration(startDate: string, endDate: string): { days: number
   return { days: nights + 1, nights };
 }
 
+/** "8 days · 7 nights", "1 day · 0 nights", "2 days · 1 night". */
+export function durationText(startDate: string, endDate: string): string {
+  const { days, nights } = tripDuration(startDate, endDate);
+  return `${days} ${days === 1 ? 'day' : 'days'} · ${nights} ${nights === 1 ? 'night' : 'nights'}`;
+}
+
 export function addDays(iso: string, n: number): string {
   const d = new Date((dayNumber(iso) + n) * 86_400_000);
   return d.toISOString().slice(0, 10);

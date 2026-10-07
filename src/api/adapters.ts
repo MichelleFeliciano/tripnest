@@ -50,8 +50,7 @@ export const packingLike = (p: PackingItem): PackingItemLike => ({
   ownerId: p.owner_id,
 });
 
-export function nameOf(data: TripData, userId: string | null | undefined): string {
-  if (!userId) return 'Someone';
-  const m = data.members.find((x) => x.user_id === userId);
-  return m?.profile?.display_name || m?.profile?.email || 'Former traveler';
+export function nameOf(data: TripData, travelerId: string | null | undefined): string {
+  if (!travelerId) return 'Someone';
+  return data.travelers.find((t) => t.id === travelerId)?.name ?? 'Former traveler';
 }

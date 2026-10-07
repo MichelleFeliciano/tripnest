@@ -1,19 +1,14 @@
-import type { Role } from '../lib/permissions';
 import type { ItemType } from '../lib/itinerary';
 import type { SplitMethod } from '../lib/splits';
 import type { ExpenseCategory, BudgetCategory } from '../lib/budget';
 import type { TripStatus } from '../lib/trip';
 
-export interface Profile {
-  id: string;
-  email: string;
-  display_name: string;
-  avatar_url: string | null;
-  home_timezone: string;
-}
+/**
+ * Everything is stored on the device. People who share a trip are "travelers": just names, not accounts.
+ * Fields named user_id / paid_by / assigned_to / owner_id / from_user / to_user all hold a traveler id.
+ */
 export interface Trip {
   id: string;
-  owner_id: string;
   name: string;
   description: string | null;
   start_date: string;
@@ -24,20 +19,15 @@ export interface Trip {
   notes: string | null;
   default_currency: string;
   budget_near_pct: number;
+  created_at: string;
 }
-export interface Member {
-  trip_id: string;
-  user_id: string;
-  role: Role;
-}
-export interface Invitation {
+export interface Traveler {
   id: string;
   trip_id: string;
-  email: string;
-  role: 'editor' | 'viewer';
-  status: 'pending' | 'accepted' | 'declined' | 'expired';
-  expires_at: string;
-  created_at: string;
+  name: string;
+  /** The traveler this device's owner is (drives "you owe…" wording and the personal packing list). */
+  is_me: boolean;
+  sort_order: number;
 }
 export interface Destination {
   id: string;
@@ -114,11 +104,11 @@ export interface PackingItem {
   notes: string | null;
   is_shared: boolean;
   owner_id: string | null;
+  created_at: string;
 }
 export interface Expense {
   id: string;
   trip_id: string;
-  created_by: string;
   paid_by: string;
   description: string;
   amount_cents: number;
@@ -128,6 +118,7 @@ export interface Expense {
   notes: string | null;
   itinerary_item_id: string | null;
   split_method: SplitMethod;
+  created_at: string;
   expense_splits: { user_id: string; amount_cents: number; share_value: number | null }[];
 }
 export interface Settlement {
@@ -155,7 +146,6 @@ export interface Note {
   scope: NoteScope;
   target_id: string | null;
   body: string;
-  created_by: string | null;
   created_at: string;
 }
 export interface DocumentRow {
@@ -163,19 +153,17 @@ export interface DocumentRow {
   trip_id: string;
   itinerary_item_id: string | null;
   reservation_id: string | null;
-  storage_path: string;
   file_name: string;
   mime_type: string;
   size_bytes: number;
-  uploaded_by: string;
   created_at: string;
 }
 
 export interface TripData {
   trip: Trip;
-  role: Role;
-  members: (Member & { profile: Profile | null })[];
-  invitations: Invitation[];
+  /** Traveler id of "me" on this device. */
+  me: string;
+  travelers: Traveler[];
   destinations: Destination[];
   items: ItineraryRow[];
   reservations: Reservation[];
@@ -186,6 +174,4 @@ export interface TripData {
   budgets: BudgetRowDb[];
   notes: Note[];
   documents: DocumentRow[];
-  loadedAt: number;
-  fromCache?: boolean;
 }

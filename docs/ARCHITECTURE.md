@@ -1,58 +1,41 @@
 # TripNest Architecture
 
-## Goals
-A collaborative trip planner that is mobile-first, cheap to run, and correct with money, time zones and permissions. Optional services (maps, AI, weather) must never block core use.
+## Goal
+A trip planner that is mobile-first, free to run forever, private by default, and correct with money, time zones and data. Hosted on GitHub Pages with **no backend and no accounts**.
 
-## Stack and why
-| Layer | Choice | Reason |
-|---|---|---|
-| UI | React 18 + TypeScript + Vite, plain CSS | Small, fast, no CSS framework to maintain |
-| Backend | Supabase (Postgres, Auth, Storage) | One managed service, free tier, RLS gives database-level authorization |
-| Server logic | Postgres functions (RPC) | Cross-row invariants (expenses + splits, invitations) stay atomic. No extra server to host |
-| Optional AI | Supabase Edge Function | The AI key never reaches the browser; called only on explicit click |
-| Maps | Leaflet + OpenStreetMap tiles | No API key, free; lazy-loaded with a list fallback |
-| Hosting | Any static host (Vercel/Netlify/Cloudflare Pages) + Supabase | |
+## Decisions
+| Choice | Why |
+|---|---|
+| Static web app (React + TypeScript + Vite, plain CSS) | Hosts for free on GitHub Pages; nothing to run or pay for |
+| Data in the browser's **IndexedDB** | Private (never leaves the device), works offline, holds files (documents) as well as records |
+| Travelers are **names, not accounts** | Needed for splitting costs and packing, without sign-in or sharing infrastructure |
+| Service worker generated at build time | After one visit the whole app opens with no connection |
+| Pure logic in `src/lib` | Money, splits, balances, budgets, time zones, itinerary, ICS, search are framework-free and unit tested |
+| Leaflet + OpenStreetMap, Nominatim, Overpass | Free, no API keys; optional and non-essential. The app works fully without them |
 
-There is deliberately **no custom Node server**: the browser talks to Supabase directly, and every table is protected by RLS. Pure business logic lives in `src/lib` (framework-free, unit tested).
+**Trade-off accepted:** each device has its own copy. A trip moves between devices only through an explicit backup/trip file. Real-time sharing would require a server (not built; see the end of this file).
 
 ## Layout
 ```
-src/lib/        pure, deterministic logic: money, splits, balances, budget, time, itinerary, packing, ics, search, permissions
-src/api/        thin Supabase data layer (typed), offline read cache
-src/pages/      route components;  src/components/  shared UI;  src/hooks/  drafts, async helpers
-supabase/migrations/   0001 schema · 0002 RLS + RPCs · 0003 private storage
-supabase/functions/ai-assist/   optional AI endpoint
-tests/          vitest: logic + real-Postgres (PGlite) security tests
+src/lib/       pure, deterministic logic (tested): money, splits, balances, budget, time, itinerary, packing, ics, search, explore, trip
+src/api/       db.ts (IndexedDB transactions) · api.ts (all rules + cascades) · backup.ts (export/restore/import) · settings.ts
+src/pages/     screens;  src/components/  shared UI;  src/hooks/  drafts, async helpers, trip context
+tests/         vitest (logic + storage) and tests/e2e (Playwright)
+vite.config.ts also emits dist/sw.js (the offline service worker) after each production build
 ```
 
-## Collaboration & permissions model
-Roles live in `trip_members(trip_id, user_id, role)`: `owner | editor | viewer`.
-- Helper functions (`is_trip_member`, `can_edit_trip`, `is_trip_owner`) are `SECURITY DEFINER` and used by every RLS policy.
-- Owner: everything, including trip edit/archive/delete and member management. Editor: itinerary, reservations, destinations, shared packing, expenses, settlements, budgets, notes, documents, invitations (viewer/editor only). Viewer: read-only, plus a private personal packing list.
-- Ownership is never granted by invitation or role change; the owner row cannot be removed.
-- The client mirrors the matrix in `src/lib/permissions.ts` to hide controls only. The database is authoritative.
+## Data flow
+Screens call `src/api/api.ts`. Every write runs in **one IndexedDB transaction** that validates the rule first (valid money, splits add up, same-trip references, no duplicate names...) and either fully applies or fully rolls back. Screens then reload the trip and re-render. Form input is kept in sessionStorage so a failed save never loses what was typed.
 
-### Invitations
-Owner/editor calls `create_invitation(trip, email, role)` which returns a random 244-bit token **once**; only its SHA-256 is stored and the column is not readable by clients. The owner shares the link `/invite/<token>`. `accept_invitation` requires the signed-in account's verified email to equal the invited email, checks expiry (7 days) and status, and adds the membership. Unknown token and wrong-account produce the same error. Email confirmation must be enabled in Supabase Auth.
+## Time zones
+Each timed itinerary value is `(UTC instant, IANA zone of the place)` plus `local_date`. Users type wall-clock time at the place; `zonedToUtc` converts using that zone (DST-aware: gaps roll forward, ambiguous times pick the first occurrence). Display always uses the stored zone, never the viewer's. Conflict detection compares instants. ICS export writes UTC instants plus the local time text.
 
-## Expense model
-Integer minor units everywhere (`amount_cents`, exponent per currency). `save_expense` validates the role, payer and split people are members, and that splits sum exactly to the total, inside one transaction. A deferred constraint trigger re-checks this at commit, and direct writes to `expenses`/`expense_splits`/`settlements` are revoked. Settlements are an append-only ledger. Balances and the settlement plan are **derived** (never stored). Details: [EXPENSE_LOGIC.md](EXPENSE_LOGIC.md).
+## Money
+Integer minor units everywhere; per-currency exponents (JPY 0, BHD 3...). Details in [EXPENSE_LOGIC.md](EXPENSE_LOGIC.md).
 
-## Time-zone strategy
-Each timed itinerary value is `(timestamptz instant, IANA zone of the place)`, plus `local_date` (calendar day at the place, used for grouping). Users type wall-clock time at the place; `zonedToUtc` converts using that zone (DST-aware); rendering always uses the stored zone, never the viewer's. A flight can therefore depart in `America/Chicago` and arrive in `America/Puerto_Rico`, and conflict detection compares instants. ICS export writes UTC instants plus local text in the description.
+## Offline and install
+`vite.config.ts` lists every built file into `dist/sw.js`, which precaches them. Navigation requests try the network first and fall back to the cached app shell; assets are served from the cache. Map tiles and place lookups always use the network and are never cached. A web manifest and icons make it installable.
 
-## Offline / poor connection (MVP)
-Last-loaded trip data is cached in `localStorage` and shown with a "showing saved copy" banner if the network fails; forms keep drafts in `sessionStorage` so failed submissions are not lost; errors are friendly. A service worker / mutation queue is intentionally deferred: IDs are client-safe UUIDs and `updated_at` exists, so it can be added later.
-
-## Optional integrations (not in the MVP critical path)
-- **AI** (`ai-assist`): itinerary ideas, packing suggestions, summary. Explicit click only, JWT + membership verified, cheapest model, cached in `ai_cache`; suggestions require user confirmation. Conflict detection is deterministic and needs no AI.
-- **Weather**: designed as a read-through, non-persistent fetch keyed by destination coordinates (e.g. Open-Meteo); never stored as current data. Not built.
-- **Notifications**: future reminders would use a `reminders` table + scheduled function with opt-in. Not built.
-- **Read-only share links**: `secure_share_tokens` (hash-only) is reserved.
-- Future integrations (budget app, calendar, flights...) attach through stable UUIDs and the RPC surface.
-
-## Security risks considered
-Broken access control (RLS + tests), token leakage (hashed, hidden), IDOR via cross-trip foreign keys (composite FKs), financial tampering (RPC + constraints), file exposure (private bucket + signed URLs), XSS (React escaping, no `dangerouslySetInnerHTML`, URL scheme checks), abuse (invite limits, auth rate limits). See [SECURITY.md](SECURITY.md).
-
-## Implementation plan
-Milestones 1 to 12 as specified: foundation, trips/members, itinerary, reservations, packing, expenses, budgets, documents, maps, export, AI, final QA. Each ends with tests, a commit and a QA checkpoint.
+## What is not built (and how it would be added)
+- **Sharing a trip live between two people.** Requires a shared store. Options considered: a hosted database with accounts, or a private GitHub repository used as storage with each person's GitHub token. Neither was chosen; today sharing is by exchanging a trip file.
+- **AI suggestions, weather, push notifications, currency conversion.** Deliberately omitted (they need keys or servers). Calculations never use AI.

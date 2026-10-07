@@ -1,47 +1,26 @@
-# API
+# Data API (internal)
 
-TripNest has no bespoke REST server. Clients use Supabase's auto-generated PostgREST API (RLS-protected) plus a few Postgres functions and one optional edge function. Everything requires `Authorization: Bearer <user JWT>`.
+There is no web API. The screens talk to a small TypeScript module over the on-device store. This is the surface other code (or a future sync feature) would build on. All functions throw `ApiError` with a plain-language message.
 
-## Tables (PostgREST, `/rest/v1/<table>`)
-Read: all tables the user is a member of. Direct writes are allowed only where noted.
-
-| Table | Insert | Update | Delete |
-|---|---|---|---|
-| `trips` | self as owner | owner (not `owner_id`) | owner |
-| `trip_members` | no (RPC) | owner: `role` | owner (non-owners), self-leave |
-| `destinations`, `itinerary_items`, `reservations`, `budgets` | owner/editor | owner/editor | owner/editor |
-| `notes` | owner/editor | author or owner | author or owner |
-| `packing_*` | editor (shared) / any member (own personal) | same | same |
-| `documents` | editor, own uploads | none | owner or uploader |
-| `expenses` | no (RPC) | no (RPC) | owner or creating editor |
-| `settlements` | no (RPC) | never | never |
-| `trip_invitations` | no (RPC) | no | owner / inviter |
-| `profiles` | by trigger | self: name, avatar, time zone | no |
-
-## RPC (`POST /rest/v1/rpc/<name>`)
-| Function | Args | Returns |
-|---|---|---|
-| `create_invitation` | `p_trip, p_email, p_role('editor'\|'viewer')` | raw token (once) |
-| `invitation_preview` | `p_token` | `{trip_name, role, status, expires_at}` |
-| `accept_invitation` / `decline_invitation` | `p_token` | `{status, trip_id?}` |
-| `save_expense` | `p_trip, p_expense_id (null=create), p_data jsonb, p_splits jsonb[]` | expense id |
-| `record_settlement` | `p_trip, p_from, p_to, p_amount, p_currency, p_date, p_note` | settlement id |
-
-`p_data`: `paid_by, description, amount_cents, currency, expense_date, category, notes, itinerary_item_id, split_method`.
-`p_splits`: `[{user_id, amount_cents, share_value}]`; amounts must sum to `amount_cents`.
-Errors: `42501` not allowed, `23514` invalid value or unbalanced, `23503` not a trip member, `P0002` not found.
-
-## Storage
-Bucket `trip-documents` (private). Upload to `<trip_id>/<uuid>-<name>`; read via `createSignedUrl(path, 60)`.
-
-## Edge function `ai-assist` (optional)
-`POST /functions/v1/ai-assist` body `{tripId, kind: 'itinerary'|'packing'|'summary', input:{interests,budget,activities}}`, returns `{result, cached}`. Statuses: 401 not signed in, 404 not a member, 429 hourly cap, 503 not configured.
-
-## Integration notes
-All entities use UUID primary keys and `updated_at`, so external systems (budget app, calendar, meal planner) can reference trips and items stably. Calendar export is generated client-side (`src/lib/ics.ts`).
-
-## Account deletion RPC
-| Function | Returns |
+## `src/api/api.ts`
+| Group | Functions |
 |---|---|
-| `account_deletion_preview` | `{owned_with_others[], owned_solo[], shared_trips, shared_expenses}` |
-| `delete_my_account` | nothing; raises if you still own trips others have joined |
+| `trips` | `list()`, `create(trip, travelerNames, extraDestinations)`, `update(id, patch)`, `remove(id)` (also deletes documents) |
+| `loadTrip(id)` | everything about one trip: trip, travelers, destinations, items, reservations, packing, expenses, settlements, budgets, notes, documents |
+| `travelers` | `add`, `rename`, `setMe`, `remove` (refused while the person is in an expense or payment) |
+| `rows` | `insert(table, row)`, `update(table, id, patch)`, `remove(table, id)` for destinations, itinerary items, reservations, budgets, notes, packing categories/items |
+| `packing` | `applyTemplate(tripId, template, shared, ownerId)`, `toggle(id, packed)` |
+| `expenses` | `save(tripId, expenseId \| null, expense, splits)`, `remove(id)`, `settle(...)`, `removeSettlement(id)` |
+| `documents` | `upload(tripId, file, link)`, `openUrl(id)`, `remove(doc)` |
+
+## `src/api/backup.ts`
+`exportData({ tripId?, includeFiles })` · `parseBackup(text)` (validates) · `restoreAll(file)` · `importTrips(file)` (copies, new ids) · `eraseEverything()` · `backupFileName(name?)`
+
+## `src/api/settings.ts`
+`getSettings()` / `saveSettings()`: display name and home time zone, kept in localStorage.
+
+## Pure logic (`src/lib`)
+`money` (parse/format, integer minor units) · `splits` (`computeSplits`) · `balances` (`computeNetBalances`, `suggestSettlements`) · `budget` · `time` (`zonedToUtc`, formatting) · `itinerary` (ordering, conflicts) · `packing` (progress, templates) · `ics` (`buildIcs`) · `search` · `explore` · `trip`.
+
+## Future integrations
+Everything uses UUID ids and ISO dates, so a sync or integration layer (calendar, family budget app, meal planner) can read a trip through `exportData` and write through `importTrips` without touching the screens.

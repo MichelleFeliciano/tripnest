@@ -17,7 +17,7 @@ interface Form {
 }
 
 export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { editing: ItineraryRow | null; defaultDate?: string; onDone: () => void; onCancel: () => void }) {
-  const { data, reload, can } = useTrip();
+  const { data, reload } = useTrip();
   const { trip } = data;
   const lastTz = [...data.items].reverse().find((i) => i.start_tz)?.start_tz ?? browserTimeZone();
   const initial: Form = editing
@@ -100,14 +100,12 @@ export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { e
     if (!editing || !window.confirm(`Delete "${editing.title}"? This can't be undone.`)) return;
     const ok = await run(async () => { await rows.remove('itinerary_items', editing.id); return true; });
     if (ok) { clear(); await reload(); onDone(); }
-  };
-
-  const readOnly = !can('itinerary.edit');
+  };
   return (
     <form onSubmit={submit}>
       <ErrorBanner message={error} />
       {errs.length > 0 && <div className="alert alert-error" role="alert"><ul style={{ margin: 0, paddingLeft: 18 }}>{errs.map((x) => <li key={x}>{x}</li>)}</ul></div>}
-      <fieldset disabled={readOnly} style={{ border: 0, padding: 0 }}>
+      <fieldset style={{ border: 0, padding: 0 }}>
         <div className="form-grid">
           <Field label="Title *" className="span-2">{(id) => <input id={id} value={f.title} onChange={(e) => set({ title: e.target.value })} maxLength={200} required />}</Field>
           <Field label="Type">{(id) => <select id={id} value={f.item_type} onChange={(e) => set({ item_type: e.target.value as ItemType })}>{ITEM_TYPES.map((t) => <option key={t} value={t}>{ITEM_LABELS[t]}</option>)}</select>}</Field>
@@ -137,10 +135,10 @@ export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { e
       </fieldset>
       <div className="row-between">
         <div className="row">
-          {!readOnly && <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add to itinerary'}</button>}
+          {<button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add to itinerary'}</button>}
           <button type="button" className="btn" onClick={() => { clear(); onCancel(); }}>Cancel</button>
         </div>
-        {editing && !readOnly && <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>Delete</button>}
+        {editing && <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>Delete</button>}
       </div>
     </form>
   );

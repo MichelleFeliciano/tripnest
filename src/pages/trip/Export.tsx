@@ -6,7 +6,7 @@ import { groupByDay } from '../../lib/itinerary';
 import { computeNetBalances, suggestSettlements, totalsByCurrency, NO_CONVERSION_NOTICE } from '../../lib/balances';
 import { formatMoney } from '../../lib/money';
 import { packingProgress, visibleItems } from '../../lib/packing';
-import { dayIndex, formatDateRange, tripDuration } from '../../lib/trip';
+import { dayIndex, durationText, formatDateRange } from '../../lib/trip';
 import { formatDateLong } from '../../lib/time';
 import { download } from '../../components/ui';
 import ItemRow from '../../components/ItemRow';
@@ -16,7 +16,6 @@ import { KIND_LABELS, ReservationCard } from './Reservations';
 export default function Export() {
   const { data, me } = useTrip();
   const { trip } = data;
-  const { days, nights } = tripDuration(trip.start_date, trip.end_date);
   const byDay = useMemo(() => groupByDay(data.items.map(itemLike)), [data.items]);
   const net = computeNetBalances(data.expenses.map(expenseLike), data.settlements.map(settlementLike));
   const transfers = suggestSettlements(net);
@@ -42,8 +41,8 @@ export default function Export() {
       <article aria-label="Printable trip booklet">
         <header>
           <h1>{trip.name}</h1>
-          <p>{formatDateRange(trip.start_date, trip.end_date)} · {days} days · {nights} nights{trip.primary_destination ? ` · ${trip.primary_destination}` : ''}</p>
-          <p>Travelers: {data.members.map((m) => nameOf(data, m.user_id)).join(', ')}</p>
+          <p>{formatDateRange(trip.start_date, trip.end_date)} · {durationText(trip.start_date, trip.end_date)}{trip.primary_destination ? ` · ${trip.primary_destination}` : ''}</p>
+          <p>Travelers: {data.travelers.map((t) => t.name).join(', ')}</p>
           {trip.description && <p>{trip.description}</p>}
         </header>
 

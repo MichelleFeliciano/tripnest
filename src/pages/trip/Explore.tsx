@@ -13,7 +13,7 @@ import { Alert, Empty, ErrorBanner, SafeLink } from '../../components/ui';
 const OTHER = '__other';
 
 export default function Explore() {
-  const { data, reload, can } = useTrip();
+  const { data, reload } = useTrip();
   const dates = tripDates(data.trip.start_date, data.trip.end_date);
   const [where, setWhere] = useState(data.destinations[0]?.id ?? OTHER);
   const [other, setOther] = useState('');
@@ -25,7 +25,6 @@ export default function Explore() {
   const [added, setAdded] = useState<Set<string>>(new Set());
   const search = useAction();
   const add = useAction();
-  const canEdit = can('itinerary.edit');
   const dest = data.destinations.find((d) => d.id === where);
 
   const go = async (force = false) => {
@@ -106,7 +105,7 @@ export default function Explore() {
         </div>
         <div className="row">
           <button className="btn btn-primary" onClick={() => void go()} disabled={search.busy || (where === OTHER && !other.trim())}>{search.busy ? 'Searching…' : 'Find things to do'}</button>
-          {canEdit && (
+          {(
             <label className="row">Add to
               <select value={day} onChange={(e) => setDay(e.target.value)} style={{ width: 'auto' }} aria-label="Itinerary day for added places">
                 {dates.map((d) => <option key={d} value={d}>Day {dayIndex(data.trip.start_date, d)} · {formatDateShort(d)}</option>)}
@@ -119,7 +118,7 @@ export default function Explore() {
       <ErrorBanner message={search.error ?? add.error} />
       {search.busy && <p role="status" className="muted">Looking nearby… this can take up to 30 seconds.</p>}
 
-      {meta?.geocodedFor && canEdit && (
+      {meta?.geocodedFor && (
         <Alert kind="info">
           Located {meta.label} on the map. <button className="btn btn-sm" onClick={saveLocation} disabled={add.busy}>Save this location to the destination</button> so it also appears on the trip map.
         </Alert>
@@ -144,7 +143,7 @@ export default function Explore() {
                         <a href={p.osmUrl} target="_blank" rel="noopener noreferrer">Map details</a>
                       </div>
                     </div>
-                    {canEdit && <button className="btn btn-sm" disabled={added.has(p.id) || add.busy} onClick={() => addToItinerary(p)} aria-label={`Add ${p.name} to itinerary`}>{added.has(p.id) ? 'Added ✓' : '+ Itinerary'}</button>}
+                    {<button className="btn btn-sm" disabled={added.has(p.id) || add.busy} onClick={() => addToItinerary(p)} aria-label={`Add ${p.name} to itinerary`}>{added.has(p.id) ? 'Added ✓' : '+ Itinerary'}</button>}
                   </div>
                 </li>
               ))}

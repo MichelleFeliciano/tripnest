@@ -1,14 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useTrip } from '../../hooks/contexts';
-import { AI_ENABLED } from '../../api/supabase';
 
 export default function More() {
   const { data } = useTrip();
   const base = `/trips/${data.trip.id}`;
   const links: [string, string, string][] = [
     ['explore', '🧭', 'Explore things to do'], ['details', '🧾', 'Travel details'], ['reservations', '🎫', 'Reservations'], ['budget', '📊', 'Budget'], ['notes', '📝', 'Notes'],
-    ['documents', '📎', 'Documents'], ['members', '👥', 'Members'], ['map', '🗺️', 'Map'], ['search', '🔍', 'Search'], ['export', '🖨️', 'Export & print'], ['settings', '⚙️', 'Trip settings'],
-    ...(AI_ENABLED ? [['assistant', '✨', 'AI assistant (optional)'] as [string, string, string]] : []),
+    ['documents', '📎', 'Documents'], ['members', '👥', 'Travelers'], ['map', '🗺️', 'Map'], ['search', '🔍', 'Search'], ['export', '🖨️', 'Export & print'], ['settings', '⚙️', 'Trip settings'],
   ];
   return (
     <div>

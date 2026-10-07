@@ -22,7 +22,7 @@ function Line({ l, currency }: { l: BudgetLine; currency: string }) {
 }
 
 export default function Budget() {
-  const { data, reload, can } = useTrip();
+  const { data, reload } = useTrip();
   const [editing, setEditing] = useState(false);
   const existingCur = data.budgets[0]?.currency ?? data.trip.default_currency;
   const [currency, setCurrency] = useState(existingCur);
@@ -31,8 +31,7 @@ export default function Budget() {
     return b ? minorToInput(b.amount_cents, b.currency) : '';
   };
   const [vals, setVals] = useState<Record<string, string>>({});
-  const { busy, error, run } = useAction();
-  const canEdit = can('budget.edit');
+  const { busy, error, run } = useAction();
 
   const rowsForSummary: BudgetRow[] = data.budgets.map((b) => ({ category: b.category, amountCents: b.amount_cents, currency: b.currency }));
   const summary = summarizeBudget(rowsForSummary, data.expenses.map((e) => ({ category: e.category, amountCents: e.amount_cents, currency: e.currency })), data.trip.budget_near_pct);
@@ -67,7 +66,7 @@ export default function Budget() {
   const nearPct = data.trip.budget_near_pct;
   return (
     <div>
-      <div className="row-between"><h2>Budget</h2>{canEdit && !editing && <button className="btn btn-primary" onClick={start}>{data.budgets.length ? 'Edit budget' : 'Set budget'}</button>}</div>
+      <div className="row-between"><h2>Budget</h2>{!editing && <button className="btn btn-primary" onClick={start}>{data.budgets.length ? 'Edit budget' : 'Set budget'}</button>}</div>
       {editing ? (
         <form className="card" onSubmit={save}>
           <ErrorBanner message={error} />

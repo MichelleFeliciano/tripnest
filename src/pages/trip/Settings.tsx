@@ -8,7 +8,7 @@ import { STATUS_LABELS, TRIP_STATUSES, tripDuration, validateTrip, type TripStat
 import { Alert, ErrorBanner, Field } from '../../components/ui';
 
 export default function Settings() {
-  const { data, reload, can } = useTrip();
+  const { data, reload } = useTrip();
   const nav = useNavigate();
   const t = data.trip;
   const [f, setF] = useState({
@@ -21,7 +21,6 @@ export default function Settings() {
   const [errs, setErrs] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const { busy, error, run } = useAction();
-  const owner = can('trip.edit');
   const dur = f.end_date >= f.start_date ? tripDuration(f.start_date, f.end_date) : null;
 
   const save = async (e: FormEvent) => {
@@ -40,12 +39,11 @@ export default function Settings() {
     if (ok) await reload();
   };
   const del = async () => {
-    if (window.prompt(`This permanently deletes the trip and everything in it for all travelers.\nType the trip name to confirm:`) !== t.name) return;
+    if (window.prompt(`This permanently deletes the trip and everything in it, including documents, from this device.\nTip: download a backup first (Profile page) if you might want it back.\nType the trip name to confirm:`) !== t.name) return;
     const ok = await run(async () => { await trips.remove(t.id); return true; });
     if (ok) nav('/trips', { replace: true });
   };
 
-  if (!owner) return <Alert kind="info">Only the trip owner can change trip settings.</Alert>;
   return (
     <div>
       <h2>Trip settings</h2>

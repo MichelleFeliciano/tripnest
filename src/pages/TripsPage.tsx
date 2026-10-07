@@ -1,18 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { trips as tripsApi } from '../api/api';
+import { friendly, trips as tripsApi } from '../api/api';
+import { importTrips, parseBackup } from '../api/backup';
 import type { Trip } from '../api/types';
-import { Alert, Empty, Spinner, StatusBadge } from '../components/ui';
+import { Alert, Empty, ErrorBanner, Spinner, StatusBadge } from '../components/ui';
+import { useAction } from '../hooks/hooks';
 import { formatDateRange, tripDuration } from '../lib/trip';
 
 export default function TripsPage() {
   const [list, setList] = useState<Trip[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const imp = useAction();
 
-  useEffect(() => {
-    tripsApi.list().then(setList).catch((e: Error) => setError(e.message));
-  }, []);
+  const refresh = () => tripsApi.list().then(setList).catch((e) => setError(friendly(e).message));
+  useEffect(() => { void refresh(); }, []);
+
+  const onFile = async (f: File | undefined) => {
+    if (!f) return;
+    setNotice(null);
+    const ids = await imp.run(async () => importTrips(parseBackup(await f.text())));
+    if (fileRef.current) fileRef.current.value = '';
+    if (ids) { setNotice(`Added ${ids.length} ${ids.length === 1 ? 'trip' : 'trips'} from the file.`); await refresh(); }
+  };
 
   if (error) return <main className="container"><Alert>{error}</Alert></main>;
   if (!list) return <Spinner />;
@@ -22,25 +34,36 @@ export default function TripsPage() {
 
   return (
     <main className="container">
-      <div className="row-between">
+      <div className="hero">
         <h1>Your trips</h1>
-        <Link className="btn btn-primary" to="/trips/new">+ New trip</Link>
+        <p>Plan it all in one place. Everything stays on this device.</p>
       </div>
+      <div className="row-between" style={{ marginBottom: 12 }}>
+        <div className="row">
+          <Link className="btn btn-primary" to="/trips/new">+ New trip</Link>
+          <label className="btn">
+            Import a trip file
+            <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
+          </label>
+        </div>
+      </div>
+      {notice && <Alert kind="success">{notice}</Alert>}
+      <ErrorBanner message={imp.error} />
       {shown.length === 0 ? (
-        <Empty title="No trips yet">Create your first trip, or open an invitation link someone sent you.</Empty>
+        <Empty title="No trips yet">Create your first trip, or import a trip file someone sent you.</Empty>
       ) : (
         <ul className="list grid grid-2" style={{ gap: 16 }}>
           {shown.map((t) => {
             const { days, nights } = tripDuration(t.start_date, t.end_date);
             return (
-              <li key={t.id} className="card" style={{ margin: 0 }}>
+              <li key={t.id} className="card trip-card" style={{ margin: 0 }}>
                 {t.cover_image_url && /^https:\/\//.test(t.cover_image_url) && <img className="cover" src={t.cover_image_url} alt="" loading="lazy" referrerPolicy="no-referrer" />}
                 <div className="row-between">
                   <h2 style={{ margin: 0 }}><Link to={`/trips/${t.id}`}>{t.name}</Link></h2>
                   <StatusBadge status={t.status} />
                 </div>
                 <p className="muted">{formatDateRange(t.start_date, t.end_date)} · {days} {days === 1 ? 'day' : 'days'} · {nights} {nights === 1 ? 'night' : 'nights'}</p>
-                {t.primary_destination && <p>📍 {t.primary_destination}</p>}
+                {t.primary_destination && <p><span aria-hidden="true">📍 </span>{t.primary_destination}</p>}
               </li>
             );
           })}
@@ -49,6 +72,7 @@ export default function TripsPage() {
       {archived.length > 0 && (
         <button className="btn btn-ghost" onClick={() => setShowArchived((s) => !s)}>{showArchived ? 'Hide' : 'Show'} archived ({archived.length})</button>
       )}
+      <p className="muted" style={{ marginTop: 24 }}>Tip: use <Link to="/profile">Profile → Back up</Link> now and then. Trips are stored only in this browser.</p>
     </main>
   );
 }

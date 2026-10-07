@@ -1,31 +1,26 @@
-# Security
+# Privacy and security
 
 ## Model
-The browser holds only the Supabase **anon** key. All authorization is enforced in Postgres, so a modified client gains nothing.
+TripNest has **no server, no accounts and no analytics**. Your trips, expenses and documents live only in your browser's storage on your device. There is no login to attack and no database to breach. The security question becomes: who can use this device or browser profile, and what does the page itself do.
 
-| Layer | Protection |
+| Area | What protects it |
 |---|---|
-| Authentication | Supabase Auth (bcrypt, email confirmation, reset by emailed link, built-in rate limits). Sessions are JWTs; signing out clears the local trip cache |
-| Authorization | RLS on all 17 tables; roles from `trip_members`; helper functions `is_trip_member / can_edit_trip / is_trip_owner` |
-| Privileges | `anon` has no table or function access. Clients cannot write `expenses`, `expense_splits`, `settlements`, `ai_cache`, `trip_members` (insert/update except role), or invitations directly. Column-level grants stop users changing `trips.owner_id` or `profiles.email`. `trip_invitations.token_hash` is not selectable |
-| Invitations | 244-bit random token shown once, only its SHA-256 stored, 7-day expiry, single use, tied to an email: only a signed-in account with that email can preview/accept; unknown token and wrong account give the same error. Ownership can't be granted. Limits: 25 pending per trip, 20 created per user per hour |
-| Money integrity | See EXPENSE_LOGIC.md: RPC validation + deferred constraint + revoked direct writes + append-only settlements; only the payer, receiver or owner can record a settlement |
-| Cross-trip leaks | Composite foreign keys; note-target trigger; packing-assignee trigger |
-| Documents | Private bucket; objects live under `<trip_id>/…`; storage RLS checks membership of that trip; uploads need editor; viewers can't write; MIME allow-list and 10 MB limit (client and database); the browser only ever receives **60-second signed URLs**, requested on click and never stored |
-| Input/Output | Length and format checks in SQL and forms; React escapes output; no `dangerouslySetInnerHTML`; map popups built from text nodes; external links must be http(s) and use `rel="noopener noreferrer"`; cover images https-only with `referrerPolicy=no-referrer` |
-| Secrets | `.env` is git-ignored; only `VITE_*` public values go to the browser. The Anthropic key lives in Supabase secrets, used only inside the edge function |
-| AI | Off by default; edge function verifies the JWT, reads trip data through the user's own RLS-bound client, caps 20 calls/hour/user, and returns suggestions that the UI applies only after the user clicks "Add" |
+| Where data lives | Your browser's IndexedDB on your device. It is never uploaded. Different phones and different browser profiles are separate |
+| Network use | Only optional lookups: OpenStreetMap map tiles (Map page), Nominatim geocoding ("Find coordinates"), Overpass places (Explore). They receive coordinates or a place name you typed, never your trip, names, money or documents. Nothing else leaves the page |
+| Output encoding | React escapes all text; no `dangerouslySetInnerHTML`; map popups are built from text nodes |
+| Links | External links must be http(s) and use `rel="noopener noreferrer"`; cover images are https-only and sent with no referrer |
+| Imported files | Backup and trip files are parsed as data (never executed), size-limited, and structurally validated (ids, dates, time zones, money, that splits add up, that every row belongs to a trip). A bad file is refused and changes nothing. Restores are transactional |
+| Documents | Stored as files in IndexedDB; only PDFs, common images and text up to 10 MB are accepted. They open through a temporary local link in a new tab |
+| Money integrity | See [EXPENSE_LOGIC.md](EXPENSE_LOGIC.md): integer arithmetic, splits validated on every save and import |
+| Dependencies | No runtime backend libraries (React, React Router and Leaflet only) |
+| Offline cache | The service worker caches only this site's own build files, never user data or third-party requests |
 
-## Verified by tests
-`tests/rls.test.ts` runs the real migrations in Postgres and checks, among others: outsiders see nothing; viewers can't write; editors can't alter/delete/archive trips or change roles; owner can't be removed or demoted; ownership can't be reassigned; invitation tokens are hidden, single-use, email-bound, expiring, can't grant owner; expense splits must balance and bypass attempts fail; settlements can't be edited or deleted; personal packing lists are private; storage objects/documents are member-only and trip-scoped.
+## Limits you should know about
+- **Anyone who can open this browser profile can read the trips.** Use your phone's lock screen. There is no app-level password.
+- **Clearing site data deletes your trips.** Download a backup now and then (Profile → Download a backup). TripNest asks the browser for persistent storage, which most browsers grant for installed or frequently used sites, but it is not guaranteed.
+- **Backup files are not encrypted.** They contain everything in the trip, including confirmation numbers and (optionally) documents. Store and share them like any private document.
+- **A CSP header** is not set (GitHub Pages cannot send custom headers). The app does not load third-party scripts, and the only third-party hosts it contacts are the three OpenStreetMap services above.
+- There is no way to share a trip live, and therefore no sharing permissions to get wrong.
 
-## Known gaps / operator responsibilities
-- **Enable email confirmation** in Supabase Auth; invitation matching trusts the JWT email.
-- Edge-function CORS is `*` (it still requires a valid JWT). Restrict to your origin in production.
-- Add a Content-Security-Policy header at the host (map tiles need `img-src tile.openstreetmap.org`; Nominatim needs `connect-src nominatim.openstreetmap.org`; Explore needs `connect-src overpass-api.de`). Explore only sends coordinates and a fixed category query to these public services, never trip or personal data.
-- The invitation link is shared by the inviter manually; email delivery is not built.
-- No MFA/audit log in the MVP. Supabase's own auth rate limits apply to sign-in and reset.
-- The local cache (`localStorage`) holds the last viewed trip on that device; it's cleared at log out but not encrypted.
-
-## Account deletion
-`delete_my_account()` (SECURITY DEFINER, acts only on `auth.uid()`) is the only way to delete an account; browsers cannot call the Auth admin API. It refuses while the user owns a trip other people have joined. Otherwise it deletes trips only that user was on (the app removes their stored files first), re-attributes their expenses, splits, payments and uploads to a non-login placeholder "Former traveler" so other people's balances never change, then deletes the auth user (cascading their profile, memberships and personal packing lists). The UI requires typing the account email after a preview of exactly what will happen. Covered by `tests/account-deletion.test.ts`.
+## Erasing
+Profile → *Erase all data on this device* removes every trip, document and setting after a typed confirmation. Deleting a single trip (Trip settings) removes its documents too.

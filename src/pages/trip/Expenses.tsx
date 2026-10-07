@@ -5,7 +5,6 @@ import { expenseLike, nameOf, settlementLike } from '../../api/adapters';
 import type { Expense } from '../../api/types';
 import { useTrip } from '../../hooks/contexts';
 import { useAction } from '../../hooks/hooks';
-import { canModifyExpense } from '../../lib/permissions';
 import { computeNetBalances, hasMixedCurrencies, NO_CONVERSION_NOTICE, suggestSettlements, totalsByCurrency, type Transfer } from '../../lib/balances';
 import { EXPENSE_CATEGORIES } from '../../lib/budget';
 import { COMMON_CURRENCIES, MoneyError, formatMoney, minorToInput, parseMoney } from '../../lib/money';
@@ -24,9 +23,9 @@ interface Form {
 }
 
 export default function Expenses() {
-  const { data, me, reload, can } = useTrip();
+  const { data, me, reload } = useTrip();
   const [sp, setSp] = useSearchParams();
-  const memberIds = data.members.map((m) => m.user_id);
+  const memberIds = data.travelers.map((t) => t.id);
   const blank = (): Form => ({
     description: '', amount: '', currency: data.trip.default_currency, date: today(), paid_by: me, category: 'Food', notes: '', item: '', method: 'equal',
     parts: Object.fromEntries(memberIds.map((id) => [id, { on: true, value: '' }])),
@@ -42,7 +41,6 @@ export default function Expenses() {
   const transfers = useMemo(() => suggestSettlements(net), [net]);
   const totals = totalsByCurrency(exps.map((e) => ({ currency: e.currency, amountCents: e.amount_cents })));
   const mixed = hasMixedCurrencies(exps) || Object.keys(net).length > 1;
-  const canAdd = can('expenses.add');
 
   // live validation + preview of the split
   const calc = useMemo((): { splits?: SplitResult[]; total?: number; error?: string; values?: Record<string, number | null> } => {
@@ -103,6 +101,18 @@ export default function Expenses() {
     if (ok) await reload();
   };
 
+  const removePayment = async (id: string) => {
+
+    if (!window.confirm('Delete this recorded payment? The balance goes back up.')) return;
+
+    const ok = await run(async () => { await api.removeSettlement(id); return true; });
+
+    if (ok) await reload();
+
+  };
+
+  
+
   const submitSettle = async (ev: FormEvent) => {
     ev.preventDefault();
     if (!settle) return;
@@ -119,7 +129,7 @@ export default function Expenses() {
 
   return (
     <div>
-      <div className="row-between"><h2>Expenses</h2>{canAdd && <button className="btn btn-primary" onClick={() => open('new')}>+ Add expense</button>}</div>
+      <div className="row-between"><h2>Expenses</h2>{<button className="btn btn-primary" onClick={() => open('new')}>+ Add expense</button>}</div>
       <ErrorBanner message={editing ? null : error} />
 
       <section className="card" aria-labelledby="bal-h">
@@ -130,7 +140,7 @@ export default function Expenses() {
             {transfers.map((t, i) => (
               <li key={i} className="row-between">
                 <span><strong>{nameOf(data, t.from)}</strong> owes <strong>{nameOf(data, t.to)}</strong> <strong>{formatMoney(t.amountCents, t.currency)}</strong>{t.from === me && ' (you)'}</span>
-                {can('settlements.record') && <button className="btn btn-sm" onClick={() => setSettle({ t, amount: minorToInput(t.amountCents, t.currency), date: today(), note: '' })}>Mark as paid</button>}
+                {<button className="btn btn-sm" onClick={() => setSettle({ t, amount: minorToInput(t.amountCents, t.currency), date: today(), note: '' })}>Mark as paid</button>}
               </li>
             ))}
           </ul>
@@ -164,7 +174,7 @@ export default function Expenses() {
                     <td>
                       <strong>{e.description}</strong>
                       <div className="muted">{e.category}{e.notes ? ` · ${e.notes}` : ''}</div>
-                      {canModifyExpense(data.role, e.created_by, me) && <div className="row" style={{ marginTop: 6 }}><button className="btn btn-sm" onClick={() => open(e)} aria-label={`Edit ${e.description}`}>Edit</button><button className="btn btn-sm btn-danger" onClick={() => remove(e)} aria-label={`Delete ${e.description}`}>Delete</button></div>}
+                      {<div className="row" style={{ marginTop: 6 }}><button className="btn btn-sm" onClick={() => open(e)} aria-label={`Edit ${e.description}`}>Edit</button><button className="btn btn-sm btn-danger" onClick={() => remove(e)} aria-label={`Delete ${e.description}`}>Delete</button></div>}
                     </td>
                     <td>{nameOf(data, e.paid_by)}</td>
                     <td className="num">{formatMoney(e.amount_cents, e.currency)}</td>
@@ -184,10 +194,10 @@ export default function Expenses() {
             <table>
               <caption className="sr-only">Recorded payments between travelers</caption>
               <thead><tr><th scope="col">Date</th><th scope="col">Paid by</th><th scope="col">Received by</th><th scope="col" className="num">Amount</th><th scope="col" className="hide-mobile">Note</th></tr></thead>
-              <tbody>{data.settlements.map((s) => <tr key={s.id}><td style={{ whiteSpace: 'nowrap' }}>{formatDateShort(s.settled_on)}</td><td>{nameOf(data, s.from_user)}</td><td>{nameOf(data, s.to_user)}</td><td className="num" style={{ whiteSpace: 'nowrap' }}>{formatMoney(s.amount_cents, s.currency)}{s.note && <div className="muted" style={{ fontSize: '.8rem' }}>{s.note}</div>}</td><td className="hide-mobile">{s.note}</td></tr>)}</tbody>
+              <tbody>{data.settlements.map((s) => <tr key={s.id}><td style={{ whiteSpace: 'nowrap' }}>{formatDateShort(s.settled_on)}</td><td>{nameOf(data, s.from_user)}</td><td>{nameOf(data, s.to_user)}</td><td className="num" style={{ whiteSpace: 'nowrap' }}>{formatMoney(s.amount_cents, s.currency)}{s.note && <div className="muted" style={{ fontSize: '.8rem' }}>{s.note}</div>}<div><button className="btn btn-sm btn-ghost" onClick={() => removePayment(s.id)} aria-label={`Delete payment of ${formatMoney(s.amount_cents, s.currency)}`}>Delete</button></div></td><td className="hide-mobile">{s.note}</td></tr>)}</tbody>
             </table>
           </div>
-          <p className="muted">This is a record only. TripNest never moves money. Entries can't be edited; record a correction instead.</p>
+          <p className="muted">This is a record only. TripNest never moves money. Made a mistake? Delete the entry and record it again.</p>
         </section>
       )}
 

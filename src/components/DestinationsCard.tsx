@@ -8,13 +8,12 @@ import { formatDateShort } from '../lib/time';
 import { Dialog, ErrorBanner, Field } from './ui';
 
 export default function DestinationsCard() {
-  const { data, reload, can } = useTrip();
+  const { data, reload } = useTrip();
   const [editing, setEditing] = useState<Destination | 'new' | null>(null);
   const [f, setF] = useState({ name: '', country: '', region: '', lat: '', lng: '', arrival: '', departure: '', notes: '' });
   const [err, setErr] = useState<string | null>(null);
   const [geo, setGeo] = useState<string | null>(null);
   const { busy, error, run } = useAction();
-  const canEdit = can('itinerary.edit');
 
   const open = (d: Destination | 'new') => {
     setEditing(d);
@@ -59,7 +58,7 @@ export default function DestinationsCard() {
 
   return (
     <section className="card" aria-labelledby="dest-h">
-      <div className="row-between"><h2 id="dest-h">Destinations</h2>{canEdit && <button className="btn btn-sm" onClick={() => open('new')}>+ Add</button>}</div>
+      <div className="row-between"><h2 id="dest-h">Destinations</h2>{<button className="btn btn-sm" onClick={() => open('new')}>+ Add</button>}</div>
       {data.destinations.length === 0 ? <p className="muted">No destinations yet.</p> : (
         <ol className="list">
           {data.destinations.map((d) => (
@@ -69,7 +68,7 @@ export default function DestinationsCard() {
                 <div className="muted">{[d.region, d.country].filter(Boolean).join(', ')}{d.arrival_date && ` · ${formatDateShort(d.arrival_date)}${d.departure_date ? ` – ${formatDateShort(d.departure_date)}` : ''}`}</div>
                 {d.notes && <div>{d.notes}</div>}
               </div>
-              {canEdit && <button className="btn btn-sm" onClick={() => open(d)} aria-label={`Edit ${d.name}`}>Edit</button>}
+              {<button className="btn btn-sm" onClick={() => open(d)} aria-label={`Edit ${d.name}`}>Edit</button>}
             </li>
           ))}
         </ol>

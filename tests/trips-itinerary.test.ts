@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, formatDateRange, tripDates, tripDuration, validateTrip } from '../src/lib/trip';
-import { can, canModifyExpense, inviteRoleAllowed } from '../src/lib/permissions';
 import { localDate, localTime, tzOffsetMs, zonedToUtc, formatTime, zoneAbbr, isValidTimeZone } from '../src/lib/time';
 import { findConflicts, groupByDay, sortItems, type ItemLike } from '../src/lib/itinerary';
 import { expandTemplate, packingProgress, PACKING_TEMPLATES, visibleItems, groupByCategory, itemsFor, type PackingItemLike } from '../src/lib/packing';
@@ -25,39 +24,6 @@ describe('trip dates', () => {
     expect(tripDuration('2028-02-27', '2028-03-01')).toEqual({ days: 4, nights: 3 });
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
     expect(tripDates('2026-06-12', '2026-06-14')).toEqual(['2026-06-12', '2026-06-13', '2026-06-14']);
-  });
-});
-
-describe('roles & permissions', () => {
-  it('owner can do everything', () => {
-    for (const a of ['trip.delete', 'trip.archive', 'members.manage', 'expenses.add', 'itinerary.edit'] as const) expect(can('owner', a)).toBe(true);
-  });
-  it('editor cannot delete/archive the trip or manage members', () => {
-    expect(can('editor', 'trip.delete')).toBe(false);
-    expect(can('editor', 'trip.archive')).toBe(false);
-    expect(can('editor', 'members.manage')).toBe(false);
-    expect(can('editor', 'itinerary.edit')).toBe(true);
-    expect(can('editor', 'expenses.add')).toBe(true);
-    expect(can('editor', 'members.invite')).toBe(true);
-  });
-  it('viewer is read-only', () => {
-    expect(can('viewer', 'trip.view')).toBe(true);
-    for (const a of ['itinerary.edit', 'expenses.add', 'packing.editShared', 'notes.edit', 'members.invite', 'documents.upload', 'trip.delete'] as const) expect(can('viewer', a)).toBe(false);
-  });
-  it('non-members have no access', () => {
-    expect(can(null, 'trip.view')).toBe(false);
-    expect(can(undefined, 'trip.view')).toBe(false);
-  });
-  it('editors modify only their own expenses', () => {
-    expect(canModifyExpense('owner', 'x', 'y')).toBe(true);
-    expect(canModifyExpense('editor', 'y', 'y')).toBe(true);
-    expect(canModifyExpense('editor', 'x', 'y')).toBe(false);
-    expect(canModifyExpense('viewer', 'y', 'y')).toBe(false);
-  });
-  it('invitations can never grant ownership; viewers cannot invite', () => {
-    expect(inviteRoleAllowed('owner', 'owner' as never)).toBe(false);
-    expect(inviteRoleAllowed('editor', 'viewer')).toBe(true);
-    expect(inviteRoleAllowed('viewer', 'viewer')).toBe(false);
   });
 });
 

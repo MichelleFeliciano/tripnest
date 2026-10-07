@@ -7,17 +7,16 @@ import { localDate, browserTimeZone } from '../../lib/time';
 import { packingProgress, visibleItems } from '../../lib/packing';
 import { totalsByCurrency, NO_CONVERSION_NOTICE, computeNetBalances, suggestSettlements } from '../../lib/balances';
 import { formatMoney } from '../../lib/money';
-import { formatDateRange, tripDuration } from '../../lib/trip';
+import { durationText, formatDateRange } from '../../lib/trip';
 import ItemRow from '../../components/ItemRow';
 import DestinationsCard from '../../components/DestinationsCard';
 import { ProgressBar } from '../../components/ui';
 import { settlementLike } from '../../api/adapters';
 
 export default function Overview() {
-  const { data, me, can } = useTrip();
+  const { data, me } = useTrip();
   const { trip } = data;
   const now = new Date();
-  const { days, nights } = tripDuration(trip.start_date, trip.end_date);
 
   const { today, next } = useMemo(() => {
     const sorted = sortItems(data.items.map(itemLike));
@@ -53,14 +52,14 @@ export default function Overview() {
         )}
       </section>
 
-      {can('itinerary.edit') && (
+      {(
         <div className="row no-print" style={{ marginBottom: 16 }} role="group" aria-label="Quick actions">
           <Link className="btn" to={`${base}/explore`}>🧭 Explore things to do</Link>
           <Link className="btn" to={`${base}/itinerary?new=1`}>+ Itinerary item</Link>
           <Link className="btn" to={`${base}/reservations?new=1`}>+ Reservation</Link>
           <Link className="btn" to={`${base}/expenses?new=1`}>+ Expense</Link>
           <Link className="btn" to={`${base}/packing?new=1`}>+ Packing item</Link>
-          <Link className="btn" to={`${base}/members`}>+ Invite traveler</Link>
+          <Link className="btn" to={`${base}/members`}>+ Add traveler</Link>
         </div>
       )}
 
@@ -69,9 +68,9 @@ export default function Overview() {
           <h2 id="sum-h">Trip</h2>
           <dl className="kv">
             <dt>Dates</dt><dd>{formatDateRange(trip.start_date, trip.end_date)}</dd>
-            <dt>Length</dt><dd>{days} days · {nights} nights</dd>
+            <dt>Length</dt><dd>{durationText(trip.start_date, trip.end_date)}</dd>
             <dt>Destination</dt><dd>{trip.primary_destination ?? '—'}</dd>
-            <dt>Travelers</dt><dd>{data.members.map((m) => nameOf(data, m.user_id)).join(', ')}</dd>
+            <dt>Travelers</dt><dd>{data.travelers.map((t) => t.name).join(', ')}</dd>
           </dl>
           {trip.description && <p>{trip.description}</p>}
         </section>

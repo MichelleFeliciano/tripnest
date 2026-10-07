@@ -28,10 +28,7 @@ jobs:
       - run: npm test
       - run: npm run build
         env:
-          # Public values by design (the anon/publishable key is protected by row-level security).
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-          VITE_AI_ENABLED: 'false'
+          # The site is served from a sub-path on GitHub Pages. No keys or secrets are needed.
           VITE_BASE: /${{ github.event.repository.name }}/
       # GitHub Pages has no SPA fallback: serve the app for deep links like /invite/<token>.
       - run: cp dist/index.html dist/404.html

@@ -1,17 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { trips } from '../api/api';
+import { getSettings, saveSettings } from '../api/settings';
 import { COMMON_CURRENCIES } from '../lib/money';
 import { TRIP_STATUSES, STATUS_LABELS, tripDuration, validateTrip, type TripStatus } from '../lib/trip';
 import { ErrorBanner, Field } from '../components/ui';
 import { useAction, useDraft } from '../hooks/hooks';
-import { useAuth } from '../hooks/contexts';
 
 export default function NewTripPage() {
-  const { user } = useAuth();
   const nav = useNavigate();
   const [f, set, clear] = useDraft('new-trip', {
-    name: '', description: '', start_date: '', end_date: '', cover_image_url: '', primary_destination: '', extra: '', status: 'planning' as TripStatus, notes: '', default_currency: 'USD',
+    name: '', description: '', start_date: '', end_date: '', cover_image_url: '', primary_destination: '', extra: '', status: 'planning' as TripStatus,
+    notes: '', default_currency: 'USD', me: getSettings().display_name, others: '',
   });
   const [errs, setErrs] = useState<string[]>([]);
   const { busy, error, run } = useAction();
@@ -21,14 +21,16 @@ export default function NewTripPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const problems = validateTrip({ name: f.name, startDate: f.start_date, endDate: f.end_date });
+    if (!f.me.trim()) problems.push('Add your name');
     if (f.cover_image_url && !/^https:\/\//i.test(f.cover_image_url)) problems.push('Cover image must be an https:// link');
     setErrs(problems);
-    if (problems.length || !user) return;
-    const extra = f.extra.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
-    const { extra: _x, ...rest } = f;
-    void _x;
-    const created = await run(() => trips.create(rest, user.id, extra));
+    if (problems.length) return;
+    const split = (s: string) => s.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+    const { extra, others, me, ...trip } = f;
+    const created = await run(() => trips.create(trip, [me, ...split(others)], split(extra)));
     if (created) {
+      const s = getSettings();
+      if (!s.display_name) saveSettings({ ...s, display_name: me });
       clear();
       nav(`/trips/${created.id}`);
     }
@@ -44,6 +46,8 @@ export default function NewTripPage() {
           <Field label="Trip name *" className="span-2">{(id) => <input id={id} value={f.name} onChange={(e) => set({ name: e.target.value })} maxLength={120} required placeholder="Puerto Rico Vacation" />}</Field>
           <Field label="Start date *">{(id) => <input id={id} type="date" value={f.start_date} onChange={(e) => set({ start_date: e.target.value, end_date: f.end_date && f.end_date < e.target.value ? e.target.value : f.end_date })} required />}</Field>
           <Field label="End date *" hint={dur ? `${dur.days} days · ${dur.nights} nights` : undefined}>{(id, d) => <input id={id} aria-describedby={d} type="date" min={f.start_date || undefined} value={f.end_date} onChange={(e) => set({ end_date: e.target.value })} required />}</Field>
+          <Field label="Your name *" hint="You'll be the first traveler">{(id, d) => <input id={id} aria-describedby={d} value={f.me} onChange={(e) => set({ me: e.target.value })} maxLength={80} required autoComplete="name" />}</Field>
+          <Field label="Who else is going?" hint="Separate names with commas. You can add more later.">{(id, d) => <input id={id} aria-describedby={d} value={f.others} onChange={(e) => set({ others: e.target.value })} placeholder="Jon, Mom" />}</Field>
           <Field label="Primary destination">{(id) => <input id={id} value={f.primary_destination} onChange={(e) => set({ primary_destination: e.target.value })} placeholder="San Juan" maxLength={200} />}</Field>
           <Field label="Additional destinations" hint="Separate with commas">{(id, d) => <input id={id} aria-describedby={d} value={f.extra} onChange={(e) => set({ extra: e.target.value })} placeholder="Ponce, Rincón" />}</Field>
           <Field label="Status">{(id) => <select id={id} value={f.status} onChange={(e) => set({ status: e.target.value as TripStatus })}>{TRIP_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}</select>}</Field>
