@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTrip } from '../../hooks/contexts';
+import { useAction } from '../../hooks/hooks';
+import { backupFileName, exportData } from '../../api/backup';
 import { expenseLike, icsItem, itemLike, nameOf, packingLike, settlementLike } from '../../api/adapters';
 import { buildIcs } from '../../lib/ics';
 import { groupByDay } from '../../lib/itinerary';
@@ -8,7 +10,7 @@ import { formatMoney } from '../../lib/money';
 import { packingProgress, visibleItems } from '../../lib/packing';
 import { dayIndex, durationText, formatDateRange } from '../../lib/trip';
 import { formatDateLong } from '../../lib/time';
-import { download } from '../../components/ui';
+import { ErrorBanner, download } from '../../components/ui';
 import ItemRow from '../../components/ItemRow';
 import { KIND_LABELS, ReservationCard } from './Reservations';
 
@@ -24,6 +26,13 @@ export default function Export() {
   const shared = mine.filter((i) => i.isShared);
   const rowOf = (id: string) => data.items.find((i) => i.id === id)!;
 
+  const [withFiles, setWithFiles] = useState(true);
+  const file = useAction();
+  const saveTrip = async () => {
+    const f = await file.run(() => exportData({ tripId: trip.id, includeFiles: withFiles }));
+    if (f) download(backupFileName(trip.name), JSON.stringify(f), 'application/json');
+  };
+
   const ics = () => download(`${trip.name.replace(/[^\w]+/g, '-').toLowerCase() || 'trip'}.ics`, buildIcs(trip.name, data.items.map(icsItem)), 'text/calendar;charset=utf-8');
 
   return (
@@ -36,6 +45,12 @@ export default function Export() {
           <button className="btn" onClick={ics} disabled={data.items.length === 0}>Download calendar (.ics)</button>
         </div>
         <p className="muted">The calendar file works with Apple, Google and Outlook calendars. Times are exact moments, so they show correctly in whichever zone your calendar uses.</p>
+        <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '16px 0' }} />
+        <h3>Send this trip to another device</h3>
+        <p className="muted">Save the whole trip as a file, then open <strong>Import a trip file</strong> on the Trips page of the other phone. It arrives as an independent copy; nothing is shared afterwards.</p>
+        <ErrorBanner message={file.error} />
+        <label className="check"><input type="checkbox" checked={withFiles} onChange={(e) => setWithFiles(e.target.checked)} /> Include uploaded documents ({data.documents.length})</label>
+        <button className="btn" onClick={saveTrip} disabled={file.busy}>{file.busy ? 'Preparing…' : 'Save trip to a file'}</button>
       </section>
 
       <article aria-label="Printable trip booklet">

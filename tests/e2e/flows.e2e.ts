@@ -152,6 +152,33 @@ test('back up, erase everything, restore: the trip comes back exactly', async ({
   await expect(page.locator('main')).toContainText('$45.50');
 });
 
+test('save one trip to a file, delete it, import the file: the trip returns as a copy', async ({ page }, info) => {
+  await createTrip(page, 'Share Me');
+  await page.getByRole('link', { name: '+ Expense' }).first().click();
+  await page.getByLabel('Description *').fill('Taxi');
+  await page.getByLabel('Amount *').fill('20');
+  await page.getByRole('button', { name: 'Save expense' }).click();
+  await expect(page.locator('main')).toContainText('$20.00');
+
+  const tripUrl = page.url().replace(/\/expenses.*$/, '');
+  await page.goto(tripUrl + '/export');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save trip to a file' }).click()]);
+  const file = info.outputPath('share-me.json');
+  await download.saveAs(file);
+  expect(download.suggestedFilename()).toMatch(/^tripnest-share-me-\d{4}-\d{2}-\d{2}\.json$/);
+
+  await page.goto(tripUrl + '/settings');
+  page.once('dialog', (d) => void d.accept('Share Me'));
+  await page.getByRole('button', { name: 'Delete trip…' }).click();
+  await expect(page.locator('main')).toContainText('No trips yet');
+
+  await page.locator('input[type=file]').first().setInputFiles(file);
+  await expect(page.getByRole('alert').or(page.getByRole('status'))).toContainText(/Added 1 trip/);
+  await page.getByRole('link', { name: 'Share Me' }).click();
+  await page.getByRole('link', { name: 'Expenses' }).last().click();
+  await expect(page.locator('main')).toContainText('$20.00');
+});
+
 test('a damaged backup file is refused and changes nothing', async ({ page }, info) => {
   await createTrip(page, 'Keep Me');
   const bad = info.outputPath('bad.json');
