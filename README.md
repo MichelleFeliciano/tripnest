@@ -33,7 +33,7 @@ No environment variables or accounts are needed.
 
 ## Testing
 ```bash
-npm test           # 103 unit + storage tests (money, splits, balances, time zones, backups, rules)
+npm test           # 138 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
 npm run build      # typecheck + production build
 npm run test:e2e   # browser tests in Microsoft Edge: every screen on phone/dark/desktop, real user journeys, offline mode
 ```

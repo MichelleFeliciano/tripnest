@@ -14,6 +14,7 @@ import { BUDGET_CATEGORIES, EXPENSE_CATEGORIES } from '../lib/budget';
 import { ITEM_TYPES } from '../lib/itinerary';
 import { MAX_MINOR_UNITS } from '../lib/money';
 import { TRIP_STATUSES, isValidIsoDate, validateTrip } from '../lib/trip';
+import { uuid } from '../lib/uuid';
 
 export class ApiError extends Error {}
 
@@ -26,6 +27,10 @@ export function friendly(e: unknown): ApiError {
   return new ApiError(err.message || 'Something went wrong. Please try again.');
 }
 
+/** Sorting helpers that tolerate missing fields (records from hand-edited files). */
+const str = (v: unknown) => (typeof v === 'string' ? v : '');
+const ord = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
 /** Empty strings become null so optional fields stay clean. */
 export function clean<T extends Record<string, unknown>>(o: T): T {
   const out: Record<string, unknown> = {};
@@ -33,7 +38,6 @@ export function clean<T extends Record<string, unknown>>(o: T): T {
   return out as T;
 }
 
-const uuid = () => crypto.randomUUID();
 const nowIso = () => new Date().toISOString();
 function need(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new ApiError(msg);
@@ -80,7 +84,7 @@ function checkTrip(t: Row) {
 export const trips = {
   list: async (): Promise<Trip[]> => {
     const rows = (await transaction(['trips'], 'readonly', (x) => x.all('trips'))) as unknown as Trip[];
-    return rows.sort((a, b) => b.start_date.localeCompare(a.start_date) || b.created_at.localeCompare(a.created_at));
+    return rows.sort((a, b) => str(b.start_date).localeCompare(str(a.start_date)) || str(b.created_at).localeCompare(str(a.created_at)));
   },
   /** names[0] is "you"; the rest are the other travelers. extraDestinations become destinations after the primary one. */
   create: async (t: NewTrip, names: string[], extraDestinations: string[]): Promise<Trip> => {
@@ -132,22 +136,22 @@ export async function loadTrip(id: string): Promise<TripData> {
     return await transaction(ALL, 'readonly', async (x) => {
       const trip = await requireTrip(x, id);
       const by = async <T,>(t: Table) => (await x.byTrip(t, id)) as unknown as T[];
-      const travelers = (await by<Traveler>('travelers')).sort((a, b) => a.sort_order - b.sort_order);
+      const travelers = (await by<Traveler>('travelers')).sort((a, b) => ord(a.sort_order) - ord(b.sort_order));
       const exps = await by<Expense>('expenses');
       return {
         trip: trip as unknown as Trip,
         me: (travelers.find((t) => t.is_me) ?? travelers[0])?.id ?? '',
         travelers,
-        destinations: (await by<Destination>('destinations')).sort((a, b) => a.sort_order - b.sort_order || (a.arrival_date ?? '').localeCompare(b.arrival_date ?? '')),
+        destinations: (await by<Destination>('destinations')).sort((a, b) => ord(a.sort_order) - ord(b.sort_order) || str(a.arrival_date).localeCompare(str(b.arrival_date))),
         items: await by<ItineraryRow>('itinerary_items'),
         reservations: await by<Reservation>('reservations'),
-        packingCategories: (await by<PackingCategory>('packing_categories')).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
-        packingItems: (await by<PackingItem>('packing_items')).sort((a, b) => a.created_at.localeCompare(b.created_at)),
-        expenses: exps.sort((a, b) => b.expense_date.localeCompare(a.expense_date) || b.created_at.localeCompare(a.created_at)),
-        settlements: (await by<Settlement>('settlements')).sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        packingCategories: (await by<PackingCategory>('packing_categories')).sort((a, b) => ord(a.sort_order) - ord(b.sort_order) || str(a.name).localeCompare(str(b.name))),
+        packingItems: (await by<PackingItem>('packing_items')).sort((a, b) => str(a.created_at).localeCompare(str(b.created_at))),
+        expenses: exps.sort((a, b) => str(b.expense_date).localeCompare(str(a.expense_date)) || str(b.created_at).localeCompare(str(a.created_at))),
+        settlements: (await by<Settlement>('settlements')).sort((a, b) => str(b.created_at).localeCompare(str(a.created_at))),
         budgets: await by<BudgetRowDb>('budgets'),
-        notes: (await by<Note>('notes')).sort((a, b) => b.created_at.localeCompare(a.created_at)),
-        documents: (await by<DocumentRow>('documents')).sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        notes: (await by<Note>('notes')).sort((a, b) => str(b.created_at).localeCompare(str(a.created_at))),
+        documents: (await by<DocumentRow>('documents')).sort((a, b) => str(b.created_at).localeCompare(str(a.created_at))),
       };
     });
   } catch (e) { throw friendly(e); }

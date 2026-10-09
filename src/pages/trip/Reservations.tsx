@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { rows } from '../../api/api';
+import { defaultZone } from '../../api/adapters';
 import type { Reservation, ReservationKind } from '../../api/types';
 import { useTrip } from '../../hooks/contexts';
 import { useAction } from '../../hooks/hooks';
-import { browserTimeZone, COMMON_TIMEZONES, isValidTimeZone, localDate, localTime, formatTime, zoneAbbr, formatDateShort, zonedToUtc } from '../../lib/time';
+import { COMMON_TIMEZONES, isValidTimeZone, localDate, localTime, formatTime, zoneAbbr, formatDateShort, zonedToUtc } from '../../lib/time';
 import { Fragment } from "react";
 import { Dialog, Empty, ErrorBanner, Field, SafeLink } from '../../components/ui';
 
@@ -64,7 +65,7 @@ export function ReservationCard({ r, onEdit }: { r: Reservation; onEdit?: (r: Re
 export default function Reservations() {
   const { data, reload } = useTrip();
   const [sp, setSp] = useSearchParams();
-  const tz0 = data.items.find((i) => i.start_tz)?.start_tz ?? browserTimeZone();
+  const tz0 = defaultZone(data.items);
   const blank = (): F => ({ kind: 'hotel', title: '', provider: '', confirmation_number: '', s_date: '', s_time: '', s_tz: tz0, e_date: '', e_time: '', e_tz: tz0, website: '', phone: '', address: '', notes: '', itinerary_item_id: '', details: {} });
   const [editing, setEditing] = useState<Reservation | 'new' | null>(sp.get('new') === '1' ? 'new' : null);
   const [f, setF] = useState<F>(blank);

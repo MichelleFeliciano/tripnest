@@ -8,9 +8,11 @@
 import { transaction, TABLES, type Row, type Table } from './db';
 import { friendly, ApiError } from './api';
 import { getSettings, saveSettings, type Settings } from './settings';
-import { isValidIsoDate, validateTrip } from '../lib/trip';
+import { TRIP_STATUSES, isValidIsoDate, validateTrip } from '../lib/trip';
+import { BUDGET_CATEGORIES, EXPENSE_CATEGORIES } from '../lib/budget';
 import { isValidTimeZone } from '../lib/time';
 import { ITEM_TYPES } from '../lib/itinerary';
+import { uuid } from '../lib/uuid';
 
 export const BACKUP_FORMAT = 1;
 export const MAX_BACKUP_BYTES = 150 * 1024 * 1024;
@@ -43,7 +45,9 @@ const ALL: (Table | 'blobs')[] = [...TABLES, 'blobs'];
 /** Everything (tripId omitted) or a single trip. */
 export async function exportData(opts: { tripId?: string; includeFiles: boolean }): Promise<BackupFile> {
   try {
-    return await transaction(ALL, 'readonly', async (x) => {
+    // Read everything in ONE transaction, but do no slow work inside it: a browser closes a transaction as soon
+    // as the code awaits anything that is not a database request (such as converting a file to base64).
+    const { tables, blobs } = await transaction(ALL, 'readonly', async (x) => {
       const tables = Object.fromEntries(TABLES.map((t) => [t, [] as Row[]])) as Record<Table, Row[]>;
       if (opts.tripId) {
         const trip = await x.get('trips', opts.tripId);
@@ -53,15 +57,18 @@ export async function exportData(opts: { tripId?: string; includeFiles: boolean 
       } else {
         for (const t of TABLES) tables[t] = await x.all(t);
       }
-      const files: BackupFile['files'] = {};
+      const blobs: { id: string; type: string; blob: Blob }[] = [];
       if (opts.includeFiles) {
         for (const d of tables.documents) {
           const blob = await x.blobGet(d.id);
-          if (blob) files[d.id] = { type: d.mime_type, data: await blobToBase64(blob) };
+          if (blob) blobs.push({ id: d.id, type: d.mime_type, blob });
         }
       }
-      return { app: 'tripnest', format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), settings: opts.tripId ? undefined : getSettings(), tables, files };
+      return { tables, blobs };
     });
+    const files: BackupFile['files'] = {};
+    for (const b of blobs) files[b.id] = { type: b.type, data: await blobToBase64(b.blob) };
+    return { app: 'tripnest', format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), settings: opts.tripId ? undefined : getSettings(), tables, files };
   } catch (e) { throw friendly(e); }
 }
 
@@ -73,6 +80,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const isMoney = (n: unknown, min = 0) => typeof n === 'number' && Number.isSafeInteger(n) && n >= min && n <= 1e11;
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 64;
 const isCode = (v: unknown) => typeof v === 'string' && /^[A-Z]{3}$/.test(v);
+const instant = (v: unknown) => v === null || v === undefined || (typeof v === 'string' && Number.isFinite(Date.parse(v)));
+const RESERVATION_KINDS = ['flight', 'hotel', 'restaurant', 'activity', 'car_rental', 'other'];
 
 /** Parse and structurally validate a backup/trip file. Throws ApiError with a plain-language reason. */
 export function parseBackup(text: string): BackupFile {
@@ -98,20 +107,44 @@ export function parseBackup(text: string): BackupFile {
   for (const tr of tables.trips) {
     const problems = validateTrip({ name: String(tr.name ?? ''), startDate: String(tr.start_date ?? ''), endDate: String(tr.end_date ?? '') });
     if (problems.length) throw new ApiError(`A trip in that backup is invalid: ${problems[0]}.`);
+    if (!TRIP_STATUSES.includes(tr.status) || !isCode(tr.default_currency) || !Number.isInteger(tr.budget_near_pct) || tr.budget_near_pct < 1 || tr.budget_near_pct > 100) {
+      throw new ApiError('A trip in that backup is invalid: its status, currency or budget setting is not recognised.');
+    }
   }
   const tripIds = new Set(tables.trips.map((t) => t.id));
   for (const t of TABLES) for (const r of tables[t]) if (t !== 'trips' && !tripIds.has(r.trip_id)) throw new ApiError(`That backup has "${t}" entries that belong to no trip.`);
   for (const r of tables.itinerary_items) {
     if (typeof r.title !== 'string' || !isValidIsoDate(r.local_date) || !ITEM_TYPES.includes(r.item_type)) throw new ApiError('An itinerary item in that backup is invalid.');
     if ((r.start_at && !isValidTimeZone(r.start_tz)) || (r.end_at && !isValidTimeZone(r.end_tz))) throw new ApiError('An itinerary time in that backup has an invalid time zone.');
+    if (!instant(r.start_at) || !instant(r.end_at)) throw new ApiError('An itinerary item in that backup has a time that is not a real date and time.');
+    if (r.cost_cents !== null && r.cost_cents !== undefined && (!isMoney(r.cost_cents) || !isCode(r.currency))) throw new ApiError('An itinerary item in that backup has an invalid cost.');
   }
+  for (const r of tables.reservations) {
+    if (typeof r.title !== 'string' || !RESERVATION_KINDS.includes(r.kind) || !instant(r.starts_at) || !instant(r.ends_at) || !isObj(r.details)
+      || (r.starts_at && !isValidTimeZone(r.starts_tz)) || (r.ends_at && !isValidTimeZone(r.ends_tz))) throw new ApiError('A reservation in that backup is invalid.');
+  }
+  for (const r of tables.destinations) {
+    const num = (v: unknown, max: number) => v === null || v === undefined || (typeof v === 'number' && Math.abs(v) <= max);
+    const date = (v: unknown) => v === null || v === undefined || isValidIsoDate(String(v));
+    if (typeof r.name !== 'string' || !num(r.latitude, 90) || !num(r.longitude, 180) || !date(r.arrival_date) || !date(r.departure_date)) throw new ApiError('A destination in that backup is invalid.');
+  }
+  for (const r of tables.travelers) if (typeof r.name !== 'string' || typeof r.is_me !== 'boolean') throw new ApiError('A traveler in that backup is invalid.');
+  for (const r of tables.packing_categories) if (typeof r.name !== 'string' || typeof r.is_shared !== 'boolean') throw new ApiError('A packing category in that backup is invalid.');
+  for (const r of tables.packing_items) {
+    if (typeof r.name !== 'string' || typeof r.is_shared !== 'boolean' || typeof r.packed !== 'boolean' || !Number.isInteger(r.quantity) || r.quantity < 1 || r.quantity > 999) throw new ApiError('A packing item in that backup is invalid.');
+  }
+  for (const r of tables.budgets) {
+    if ((r.category !== null && !BUDGET_CATEGORIES.includes(r.category)) || !isMoney(r.amount_cents) || !isCode(r.currency)) throw new ApiError('A budget in that backup is invalid.');
+  }
+  for (const r of tables.notes) if (!['trip', 'destination', 'itinerary', 'reservation'].includes(r.scope) || typeof r.body !== 'string') throw new ApiError('A note in that backup is invalid.');
   for (const r of tables.expenses) {
     const splits = r.expense_splits;
+    if (typeof r.description !== 'string' || !isValidIsoDate(String(r.expense_date)) || !EXPENSE_CATEGORIES.includes(r.category) || !['equal', 'custom', 'percent', 'shares'].includes(r.split_method)) throw new ApiError('An expense in that backup is invalid.');
     if (!isMoney(r.amount_cents, 1) || !isCode(r.currency) || !isId(r.paid_by) || !Array.isArray(splits) || splits.length === 0 || !splits.every((s: unknown) => isObj(s) && isId(s.user_id) && isMoney(s.amount_cents))
       || splits.reduce((a: number, s: { amount_cents: number }) => a + s.amount_cents, 0) !== r.amount_cents) throw new ApiError('An expense in that backup is invalid (its split does not add up).');
   }
   for (const r of tables.settlements) {
-    if (!isMoney(r.amount_cents, 1) || !isCode(r.currency) || !isId(r.from_user) || !isId(r.to_user) || r.from_user === r.to_user) throw new ApiError('A payment in that backup is invalid.');
+    if (!isMoney(r.amount_cents, 1) || !isCode(r.currency) || !isId(r.from_user) || !isId(r.to_user) || r.from_user === r.to_user || !isValidIsoDate(String(r.settled_on))) throw new ApiError('A payment in that backup is invalid.');
   }
   const files: BackupFile['files'] = {};
   if (isObj(j.files)) {
@@ -158,13 +191,13 @@ export async function importTrips(file: BackupFile): Promise<string[]> {
         const map: Partial<Record<Table, Map<string, string>>> = {};
         const newId = (t: Table, old: string) => {
           const m = (map[t] ??= new Map());
-          if (!m.has(old)) m.set(old, crypto.randomUUID());
+          if (!m.has(old)) m.set(old, uuid());
           return m.get(old)!;
         };
         const lookup = (t: Table, old: unknown) => (typeof old === 'string' && map[t]?.has(old) ? map[t]!.get(old)! : null);
         const mine = (t: Table) => file.tables[t].filter((r) => r.trip_id === trip.id);
         for (const t of TABLES) if (t !== 'trips') for (const r of mine(t)) newId(t, r.id);
-        const tripId = crypto.randomUUID();
+        const tripId = uuid();
         const name = existingNames.has(String(trip.name).toLowerCase()) ? `${trip.name} (copy)`.slice(0, 120) : trip.name;
         existingNames.add(String(name).toLowerCase());
         await x.put('trips', { ...trip, id: tripId, name });

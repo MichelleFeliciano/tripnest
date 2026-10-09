@@ -34,6 +34,46 @@ test('create a trip, add to the itinerary, and it is still there after a reload'
   await expect(page.locator('main')).toContainText('Boat rental');
 });
 
+test('moving an itinerary item to another day keeps its times and does not trip over a stale end date', async ({ page }) => {
+  await createTrip(page);
+  await page.getByRole('link', { name: '+ Itinerary item' }).first().click();
+  await page.getByLabel('Title *').fill('Museum');
+  await page.getByLabel('Start time', { exact: true }).fill('10:00');
+  await page.getByLabel('End time', { exact: true }).fill('11:30');
+  await page.getByRole('button', { name: 'Add to itinerary' }).click();
+  const day1 = page.locator('section[aria-labelledby="day-2027-06-12"]');
+  await expect(day1).toContainText('Museum');
+
+  await page.getByRole('button', { name: 'Edit Museum' }).click();
+  await page.getByLabel('Date *', { exact: true }).fill('2027-06-13');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.locator('section[aria-labelledby="day-2027-06-13"]')).toContainText('Museum');
+  await expect(page.locator('section[aria-labelledby="day-2027-06-13"]')).toContainText('10:00 AM');
+  await expect(day1).not.toContainText('Museum');
+});
+
+test('an item left outside a shortened trip can still be edited and saved', async ({ page }) => {
+  await createTrip(page); // Jun 12-14
+  await page.getByRole('link', { name: '+ Itinerary item' }).first().click();
+  await page.getByLabel('Title *').fill('Farewell lunch');
+  await page.getByLabel('Date *', { exact: true }).fill('2027-06-14');
+  await page.getByRole('button', { name: 'Add to itinerary' }).click();
+  await expect(page.locator('main')).toContainText('Farewell lunch');
+
+  const base = page.url().replace(/\/itinerary.*$/, '');
+  await page.goto(base + '/settings');
+  await page.getByLabel('End date', { exact: true }).fill('2027-06-13');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByText('Saved.')).toBeVisible();
+
+  await page.goto(base + '/itinerary');
+  await expect(page.locator('main')).toContainText('Farewell lunch'); // still shown, under its own day
+  await page.getByRole('button', { name: 'Edit Farewell lunch' }).click();
+  await page.getByLabel('Description').fill('Edited after the trip was shortened');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.locator('main')).toContainText('Edited after the trip was shortened');
+});
+
 test('invalid input is refused with a clear message and nothing is saved', async ({ page }) => {
   await page.goto('/trips/new');
   await page.getByLabel('Trip name *').fill('Backwards');

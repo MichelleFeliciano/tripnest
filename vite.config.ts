@@ -44,8 +44,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // map tiles, place lookups: network only
   if (req.mode === 'navigate') {
-    // Online: always fetch the newest page. Offline: serve the cached app shell for any route.
-    event.respondWith(fetch(req).catch(() => caches.match(self.registration.scope, { ignoreVary: true }).then((r) => r || Response.error())));
+    // Prefer the newest page, but never make someone on a weak connection wait: after 4 seconds (or offline) use the cached app shell.
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('slow network')), 4000));
+    event.respondWith(Promise.race([fetch(req), timeout]).catch(() => caches.match(self.registration.scope, { ignoreVary: true }).then((r) => r || fetch(req))));
     return;
   }
   // ignoreVary: module scripts are requested with an Origin header, which some servers vary on; we cache one copy.

@@ -28,11 +28,15 @@ export default function Documents() {
 
   // Files are kept on this device. Opening makes a temporary link to the stored copy.
   const view = async (d: DocumentRow) => {
+    // Open the tab first, inside the tap, so pop-up blockers allow it. (window.open with the "noopener" option
+    // always returns null, which would look like a blocked pop-up even when it worked.)
+    const w = window.open('', '_blank');
     const url = await open.run(() => documents.openUrl(d.id));
-    if (!url) return;
-    const w = window.open(url, '_blank', 'noopener');
-    if (!w) open.setError('Your browser blocked the new tab. Allow pop-ups for this site and try again.');
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    if (!url) { w?.close(); return; }
+    if (!w) { URL.revokeObjectURL(url); open.setError('Your browser blocked the new tab. Allow pop-ups for this site and try again.'); return; }
+    w.opener = null;
+    w.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
   };
   const del = async (d: DocumentRow) => {
     if (!window.confirm(`Delete ${d.file_name}?`)) return;

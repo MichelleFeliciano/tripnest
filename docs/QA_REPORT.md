@@ -6,12 +6,14 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 | Check | Result |
 |---|---|
 | Type check (`tsc --noEmit`) | clean |
-| Unit + storage tests (`npm test`, 5 files) | **103 passed**, 0 failed |
+| Unit, storage and property tests (`npm test`, 7 files) | **138 passed**, 0 failed |
 | Production build | succeeds (app script 225 kB, 73 kB gzipped; map code loads only on the Map page) |
-| Browser tests (`npm run test:e2e`, Microsoft Edge) | **137 passed**, 0 failed, 3 skipped (phone-only checks on desktop) |
+| Browser tests (`npm run test:e2e`, Microsoft Edge) | **146 passed**, 0 failed, 10 skipped (checks that only apply to some screen sizes) |
 
 ## What is tested
 **Logic (unit):** trip dates and duration; time zones including the Chicagoâ†’Puerto Rico flight, daylight-saving gaps/ambiguity, half-hour zones; itinerary ordering and cross-zone conflicts; packing progress, templates, privacy of personal lists; budgets and thresholds; search; Explore query building, ranking and junk filtering; ICS output (structure, line folding, escaping, UTC instants, all-day events); money parsing (including `12,50`), every split method with property tests over thousands of totals, balances, settlement simplification, partial and over-payments, multiple currencies.
+
+**Property tests (thousands of generated cases each, seeded so failures are reproducible):** wall-clock time round-trips through UTC for 16 zones (including 30- and 45-minute offsets, Lord Howe and Chatham daylight saving, southern-hemisphere DST) on every day of a year with daylight-saving gaps rolling forward only; later times never map to earlier instants; 3,000 random ledgers (all four split methods, two currencies, payments) always net to zero and clear with at most n-1 transfers, independent of input order; money parse/format round-trips exactly for USD/JPY/BHD/EUR and 20,000 junk strings never throw anything but `MoneyError`; hostile text (emoji, CR/LF, backslashes) always produces valid calendar lines of at most 75 bytes that unfold back to the original; budget math matches an independent calculation; conflict detection matches a brute-force check; trip date lists agree across leap years and month ends.
 
 **On-device data layer (27 tests, fake IndexedDB):** every rule in [DATABASE.md](DATABASE.md): invalid dates/money/coordinates/URLs refused; splits must add up; payer and split people must be on the trip; cross-trip references refused; rows cannot move to another trip; failed saves leave nothing behind; cascades and unlinking; traveler removal blocked while in an expense or payment; documents (type, size, open, delete with trip); **backup round-trip including documents; importing a trip file as an independent copy with all links remapped and identical balances; damaged or tampered backups refused; a failed restore rolls back and leaves existing data intact.**
 
@@ -22,6 +24,20 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - **offline (production build + service worker):** after one visit the network is cut; reload, a deep link and saving a new expense all work, and the data survives going back online; the manifest and icons are valid.
 
 ## Bugs found by this testing and fixed
+**Code review round (found by reading the code and probing in a real browser):**
+- **Backups failed in real browsers when they included two or more documents** ("The transaction has finished"): files were converted inside the database transaction, which a browser closes as soon as slow work happens. The in-memory test database had hidden it. Fixed; now guarded by a real-browser test.
+- **Opening a document always showed a false "blocked" message** (the browser returns nothing when the new tab is opened with the noopener option). Fixed.
+- **Any crash produced a blank page.** Added an error page that says the trips are safe and offers Reload, plus an automatic one-time reload when a new version replaces a file the page still needs.
+- **Damaged or hand-edited backups could crash a screen later** (a date that is not a date, an unknown category, a zero quantity...). Opening a file now checks every field the screens depend on and refuses it with a clear message.
+- **Half-typed itinerary forms leaked between trips** (the saved draft was not tied to a trip). Fixed.
+- **The app crashed when opened over plain http** (for example from a phone on the home network during development) because it needed `crypto.randomUUID`. Fixed with a fallback.
+- **Editing an itinerary item pre-filled an end date, so changing only the start date produced a confusing "end before start" error.** Fixed.
+- **After shortening a trip, items on removed days could not be re-saved** (the date picker rejected their own date). Fixed.
+- **The default time zone for a new item came from an arbitrary existing item.** It now follows the most recently touched one.
+- **Records missing a created time or sort order could crash lists.** Sorting is now tolerant.
+- **Slow connections:** the service worker now falls back to the cached app after 4 seconds instead of waiting on a poor network.
+
+**Earlier:**
 - Expenses page was 454 px wide on a 375 px phone (an invisible table header escaped its scroll container), pushing the **More** button off screen.
 - Money tables cut off amounts on phones; fixed by moving Edit/Delete under the description and dropping secondary columns on small screens; a regression test guards it (it caught a later regression from the new theme's padding).
 - Split-method buttons overflowed the Add Expense dialog.

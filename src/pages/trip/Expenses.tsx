@@ -102,18 +102,12 @@ export default function Expenses() {
   };
 
   const removePayment = async (id: string) => {
-
     if (!window.confirm('Delete this recorded payment? The balance goes back up.')) return;
-
     const ok = await run(async () => { await api.removeSettlement(id); return true; });
-
     if (ok) await reload();
-
   };
 
-  
-
-  const submitSettle = async (ev: FormEvent) => {
+    const submitSettle = async (ev: FormEvent) => {
     ev.preventDefault();
     if (!settle) return;
     const ok = await settleAct.run(async () => {

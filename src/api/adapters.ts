@@ -3,6 +3,7 @@ import type { IcsItem } from '../lib/ics';
 import type { ExpenseLike, SettlementLike } from '../lib/balances';
 import type { PackingItemLike } from '../lib/packing';
 import type { Expense, ItineraryRow, PackingItem, Settlement, TripData } from './types';
+import { browserTimeZone } from '../lib/time';
 
 export const itemLike = (r: ItineraryRow): ItemLike & ItineraryRow => ({
   ...r,
@@ -49,6 +50,13 @@ export const packingLike = (p: PackingItem): PackingItemLike => ({
   isShared: p.is_shared,
   ownerId: p.owner_id,
 });
+
+/** Time zone to pre-fill on a new item: the one used by whatever was added or edited most recently. */
+export function defaultZone(items: ItineraryRow[]): string {
+  const touched = (i: ItineraryRow) => i.updated_at ?? i.created_at ?? '';
+  const latest = items.filter((i) => i.start_tz).sort((a, b) => touched(b).localeCompare(touched(a)))[0];
+  return latest?.start_tz ?? browserTimeZone();
+}
 
 export function nameOf(data: TripData, travelerId: string | null | undefined): string {
   if (!travelerId) return 'Someone';

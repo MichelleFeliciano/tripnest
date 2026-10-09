@@ -65,6 +65,8 @@ export interface ItineraryRow {
   website: string | null;
   contact: string | null;
   sort_order: number;
+  created_at?: string;
+  updated_at?: string;
 }
 export type ReservationKind = 'flight' | 'hotel' | 'restaurant' | 'activity' | 'car_rental' | 'other';
 export interface Reservation {

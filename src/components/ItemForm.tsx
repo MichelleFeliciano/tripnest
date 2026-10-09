@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { rows } from '../api/api';
+import { defaultZone } from '../api/adapters';
 import { geocode, parseCoord } from '../api/geocode';
 import type { ItineraryRow } from '../api/types';
 import { useTrip } from '../hooks/contexts';
 import { useAction, useDraft } from '../hooks/hooks';
 import { COMMON_CURRENCIES, MoneyError, minorToInput, parseMoney } from '../lib/money';
 import { ITEM_LABELS, ITEM_TYPES, type ItemType } from '../lib/itinerary';
-import { browserTimeZone, COMMON_TIMEZONES, isValidTimeZone, localDate, localTime, zonedToUtc } from '../lib/time';
+import { COMMON_TIMEZONES, isValidTimeZone, localDate, localTime, zonedToUtc } from '../lib/time';
 import { tripDates } from '../lib/trip';
 import { ErrorBanner, Field } from './ui';
 
@@ -19,12 +20,14 @@ interface Form {
 export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { editing: ItineraryRow | null; defaultDate?: string; onDone: () => void; onCancel: () => void }) {
   const { data, reload } = useTrip();
   const { trip } = data;
-  const lastTz = [...data.items].reverse().find((i) => i.start_tz)?.start_tz ?? browserTimeZone();
+  const lastTz = defaultZone(data.items);
+  const endLocalDate = editing?.end_at && editing.end_tz ? localDate(editing.end_at, editing.end_tz) : '';
   const initial: Form = editing
     ? {
         title: editing.title, item_type: editing.item_type, date: editing.local_date,
         start_time: editing.start_at && editing.start_tz ? localTime(editing.start_at, editing.start_tz) : '',
-        end_date: editing.end_at && editing.end_tz ? localDate(editing.end_at, editing.end_tz) : '',
+        // only pre-fill the end date when it is a different day, so changing the start date later cannot leave a stale end date behind
+        end_date: endLocalDate && endLocalDate !== editing.local_date ? endLocalDate : '',
         end_time: editing.end_at && editing.end_tz ? localTime(editing.end_at, editing.end_tz) : '',
         start_tz: editing.start_tz ?? lastTz, end_tz: editing.end_tz ?? editing.start_tz ?? lastTz,
         description: editing.description ?? '', location_name: editing.location_name ?? '', address: editing.address ?? '',
@@ -38,11 +41,14 @@ export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { e
         description: '', location_name: '', address: '', lat: '', lng: '', notes: '', cost: '', currency: trip.default_currency,
         confirmation_number: '', website: '', contact: '', destination_id: '',
       };
-  const [f, set, clear] = useDraft<Form>(`item-${editing?.id ?? 'new'}`, initial);
+  const [f, set, clear] = useDraft<Form>(`item-${trip.id}-${editing?.id ?? 'new'}`, initial);
   const [errs, setErrs] = useState<string[]>([]);
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   const dates = tripDates(trip.start_date, trip.end_date);
+  // The picker is limited to the trip's days, but never so tightly that an existing item (from before the trip was shortened) cannot be saved.
+  const minDate = editing && editing.local_date < dates[0] ? editing.local_date : dates[0];
+  const maxDate = editing && editing.local_date > dates[dates.length - 1] ? editing.local_date : dates[dates.length - 1];
 
   const lookup = async () => {
     setGeoMsg('Looking up…');
@@ -100,7 +106,7 @@ export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { e
     if (!editing || !window.confirm(`Delete "${editing.title}"? This can't be undone.`)) return;
     const ok = await run(async () => { await rows.remove('itinerary_items', editing.id); return true; });
     if (ok) { clear(); await reload(); onDone(); }
-  };
+  };
   return (
     <form onSubmit={submit}>
       <ErrorBanner message={error} />
@@ -109,7 +115,7 @@ export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { e
         <div className="form-grid">
           <Field label="Title *" className="span-2">{(id) => <input id={id} value={f.title} onChange={(e) => set({ title: e.target.value })} maxLength={200} required />}</Field>
           <Field label="Type">{(id) => <select id={id} value={f.item_type} onChange={(e) => set({ item_type: e.target.value as ItemType })}>{ITEM_TYPES.map((t) => <option key={t} value={t}>{ITEM_LABELS[t]}</option>)}</select>}</Field>
-          <Field label="Date *" hint="Local date at the place">{(id, d) => <input id={id} aria-describedby={d} type="date" value={f.date} onChange={(e) => set({ date: e.target.value })} required min={dates[0]} max={dates[dates.length - 1]} />}</Field>
+          <Field label="Date *" hint="Local date at the place">{(id, d) => <input id={id} aria-describedby={d} type="date" value={f.date} onChange={(e) => set({ date: e.target.value })} required min={minDate} max={maxDate} />}</Field>
           <Field label="Start time" hint="Leave blank for an all-day item">{(id, d) => <input id={id} aria-describedby={d} type="time" value={f.start_time} onChange={(e) => set({ start_time: e.target.value })} />}</Field>
           <Field label="Start time zone">{(id) => (<><input id={id} list="tz-opts" value={f.start_tz} onChange={(e) => set({ start_tz: e.target.value, end_tz: f.end_tz === f.start_tz ? e.target.value : f.end_tz })} /><datalist id="tz-opts">{COMMON_TIMEZONES.map((z) => <option key={z} value={z} />)}</datalist></>)}</Field>
           <Field label="End time">{(id) => <input id={id} type="time" value={f.end_time} onChange={(e) => set({ end_time: e.target.value })} />}</Field>
