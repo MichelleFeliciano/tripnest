@@ -36,7 +36,7 @@ export function validateTrip(t: TripInput): string[] {
   if (!isValidIsoDate(t.startDate)) errs.push('Start date is not a valid date');
   if (!isValidIsoDate(t.endDate)) errs.push('End date is not a valid date');
   if (errs.length === 0 && dayNumber(t.endDate) < dayNumber(t.startDate)) errs.push('End date cannot be before the start date');
-  else if (errs.length === 0 && dayNumber(t.endDate) - dayNumber(t.startDate) > 366) errs.push('Trips can be at most one year long');
+  else if (errs.length === 0 && dayNumber(t.endDate) - dayNumber(t.startDate) > 365) errs.push('Trips can be at most one year long (366 days)');
   return errs;
 }
 

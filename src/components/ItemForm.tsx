@@ -106,7 +106,7 @@ export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { e
   };
 
   const remove = async () => {
-    if (!editing || !window.confirm(`Delete "${editing.title}"? This can't be undone.`)) return;
+    if (!editing || !window.confirm(`Delete "${editing.title}"? You can bring it back from Recently deleted (Profile) for 30 days.`)) return;
     let gone: Deleted | undefined;
     const ok = await run(async () => { gone = await rows.remove('itinerary_items', editing.id); return true; });
     if (ok) toast.deleted(gone);

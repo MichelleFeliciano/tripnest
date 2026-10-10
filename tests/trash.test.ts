@@ -300,9 +300,12 @@ describe('manual order within a day', () => {
 });
 
 describe('travelers and trash', () => {
-  it('removing a traveler still works and does not leave stale trash behind', async () => {
-    const { jon } = await setup();
-    await travelers.remove(jon);
-    expect(await trash.list()).toHaveLength(0);
+  it('removing a traveler is kept in Recently deleted, so it can be undone', async () => {
+    const { t, jon } = await setup();
+    const gone = await travelers.remove(jon);
+    expect(gone.summary).toBe('Traveler “Jon”');
+    expect((await trash.list()).map((e) => [e.kind, e.label])).toEqual([['Traveler', 'Jon']]);
+    await trash.restore(gone.id);
+    expect((await loadTrip(t.id)).travelers.map((x) => x.name).sort()).toEqual(['Jon', 'Me']);
   });
 });

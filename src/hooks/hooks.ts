@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendly } from '../api/api';
+import { browserTimeZone, localDate } from '../lib/time';
 
 /**
  * Form state that survives failed submits, accidental navigation and refreshes (sessionStorage).
@@ -16,7 +17,13 @@ export function useDraft<T extends object>(key: string, initial: T): [T, (patch:
   });
   const set = useCallback((patch: Partial<T>) => setState((s) => ({ ...s, ...patch })), []);
   useEffect(() => {
-    try { sessionStorage.setItem(k, JSON.stringify(state)); } catch { /* ignore */ }
+    try {
+      // Only keep what the person has actually typed. An untouched form must not become a "draft", or reopening it later
+      // (after the item changed elsewhere, for example in a merge) would show the old values and saving would undo the change.
+      if (JSON.stringify(state) === JSON.stringify(initial)) sessionStorage.removeItem(k);
+      else sessionStorage.setItem(k, JSON.stringify(state));
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [k, state]);
   const clear = useCallback(() => {
     try { sessionStorage.removeItem(k); } catch { /* ignore */ }
@@ -48,6 +55,24 @@ export function useAction() {
     }
   }, []);
   return { busy, error, run, setError };
+}
+
+/** The current time, refreshed every minute and whenever the app comes back to the front (a phone can keep the app open overnight). */
+export function useNow(): number {
+  const minute = () => Math.floor(Date.now() / 60_000) * 60_000;
+  const [now, setNow] = useState(minute);
+  useEffect(() => {
+    const tick = () => setNow(minute());
+    const id = setInterval(tick, 30_000);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); window.removeEventListener('focus', tick); };
+  }, []);
+  return now;
+}
+/** Today's date (YYYY-MM-DD) where this device is, kept current. */
+export function useToday(): string {
+  return localDate(useNow(), browserTimeZone());
 }
 
 export function useOnline(): boolean {

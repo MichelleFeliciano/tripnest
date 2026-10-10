@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { rows } from '../../api/api';
+import { rows, type Deleted } from '../../api/api';
+import { useToast } from '../../components/Toast';
 import { useTrip } from '../../hooks/contexts';
 import { useAction } from '../../hooks/hooks';
 import { BUDGET_CATEGORIES, summarizeBudget, type BudgetCategory, type BudgetLine, type BudgetRow } from '../../lib/budget';
@@ -23,6 +24,7 @@ function Line({ l, currency }: { l: BudgetLine; currency: string }) {
 
 export default function Budget() {
   const { data, reload } = useTrip();
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const existingCur = data.budgets[0]?.currency ?? data.trip.default_currency;
   const [currency, setCurrency] = useState(existingCur);
@@ -44,6 +46,7 @@ export default function Budget() {
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
+    let lastRemoved: Deleted | undefined;
     const ok = await run(async () => {
       const entries: [BudgetCategory | null, string][] = [[null, vals.total ?? ''], ...BUDGET_CATEGORIES.map((c): [BudgetCategory, string] => [c, vals[c] ?? ''])];
       const parsed = entries.map(([cat, raw]) => {
@@ -52,7 +55,7 @@ export default function Budget() {
       }); // validate everything first so a typo never leaves a half-saved budget
       for (const { cat, cents } of parsed) {
         const existing = data.budgets.find((b) => b.category === cat);
-        if (cents === null) { if (existing) await rows.remove('budgets', existing.id, { silent: true }); continue; }
+        if (cents === null) { if (existing) lastRemoved = await rows.remove('budgets', existing.id); continue; }
         if (existing) await rows.update('budgets', existing.id, { amount_cents: cents, currency });
         else await rows.insert('budgets', { trip_id: data.trip.id, category: cat, amount_cents: cents, currency });
       }
@@ -60,7 +63,7 @@ export default function Budget() {
       for (const b of data.budgets) if (b.currency !== currency && vals[b.category ?? 'total']?.trim()) await rows.update('budgets', b.id, { currency });
       return true;
     });
-    if (ok) { await reload(); setEditing(false); }
+    if (ok) { toast.deleted(lastRemoved); await reload(); setEditing(false); }
   };
 
   const nearPct = data.trip.budget_near_pct;

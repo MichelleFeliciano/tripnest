@@ -192,6 +192,11 @@ describe('QA regression fixes: DST', () => {
     expect(zonedToUtc('2026-11-01', '01:30', 'America/Chicago').toISOString()).toBe('2026-11-01T06:30:00.000Z');
   });
   it('rejects trips longer than a year', () => {
-    expect(validateTrip({ name: 'x', startDate: '2026-01-01', endDate: '2027-06-01' })).toContain('Trips can be at most one year long');
+    expect(validateTrip({ name: 'x', startDate: '2026-01-01', endDate: '2027-06-01' })).toContain('Trips can be at most one year long (366 days)');
+  });
+  it('allows exactly 366 days and rejects 367', () => {
+    expect(validateTrip({ name: 'x', startDate: '2027-01-01', endDate: '2027-12-31' })).toEqual([]); // 365 days
+    expect(validateTrip({ name: 'x', startDate: '2028-01-01', endDate: '2028-12-31' })).toEqual([]); // 366 days (a leap year)
+    expect(validateTrip({ name: 'x', startDate: '2027-01-01', endDate: '2028-01-02' }).length).toBe(1); // 367 days
   });
 });

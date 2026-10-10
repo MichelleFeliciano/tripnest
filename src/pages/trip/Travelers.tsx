@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { travelers as api } from '../../api/api';
+import { useToast } from '../../components/Toast';
 import { useTrip } from '../../hooks/contexts';
 import { useAction } from '../../hooks/hooks';
 import { ErrorBanner, Field } from '../../components/ui';
@@ -7,6 +8,7 @@ import { ErrorBanner, Field } from '../../components/ui';
 /** The people on this trip. They are just names (no accounts), used for splitting costs and assigning packing items. */
 export default function Travelers() {
   const { data, reload } = useTrip();
+  const toast = useToast();
   const [name, setName] = useState('');
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const { busy, error, run } = useAction();
@@ -49,7 +51,7 @@ export default function Travelers() {
                   <div className="row">
                     {!t.is_me && <button className="btn btn-sm" onClick={() => act(() => api.setMe(data.trip.id, t.id))} aria-label={`Make ${t.name} the traveler this device belongs to`}>This is me</button>}
                     <button className="btn btn-sm" onClick={() => setEditing({ id: t.id, name: t.name })} aria-label={`Rename ${t.name}`}>Rename</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => act(() => api.remove(t.id), `Remove ${t.name} from this trip?`)} aria-label={`Remove ${t.name}`}>Remove</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => act(async () => { toast.deleted(await api.remove(t.id)); }, `Remove ${t.name} from this trip?`)} aria-label={`Remove ${t.name}`}>Remove</button>
                   </div>
                 </>
               )}

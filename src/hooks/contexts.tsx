@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { friendly, loadTrip } from '../api/api';
 import type { TripData } from '../api/types';
 import { DATA_CHANGED } from '../components/Toast';
@@ -22,15 +22,19 @@ export function useTripLoader(tripId: string | undefined) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const latest = useRef(tripId);
+  latest.current = tripId;
   const reload = useCallback(async () => {
     if (!tripId) return;
     try {
-      setData(await loadTrip(tripId));
+      const loaded = await loadTrip(tripId);
+      if (latest.current !== tripId) return; // the person has moved to another trip since: do not show this one
+      setData(loaded);
       setError(null);
     } catch (e) {
-      setError(friendly(e).message);
+      if (latest.current === tripId) setError(friendly(e).message);
     } finally {
-      setLoading(false);
+      if (latest.current === tripId) setLoading(false);
     }
   }, [tripId]);
   useEffect(() => { setLoading(true); setData(null); void reload(); }, [reload]);

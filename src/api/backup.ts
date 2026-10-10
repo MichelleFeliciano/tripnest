@@ -179,6 +179,19 @@ export function parseBackup(text: string): BackupFile {
   for (const r of tables.settlements) {
     if (!isMoney(r.amount_cents, 1) || !isCode(r.currency) || !isId(r.from_user) || !isId(r.to_user) || r.from_user === r.to_user || !isValidIsoDate(String(r.settled_on))) throw new ApiError('A payment in that backup is invalid.');
   }
+  // Who is on each trip, and which packing categories exist: rows may only point at things that are in the same trip.
+  const people = new Set(tables.travelers.map((t) => `${t.trip_id}:${t.id}`));
+  const categories = new Set(tables.packing_categories.map((c) => `${c.trip_id}:${c.id}`));
+  const onTrip = (r: Row, who: unknown) => typeof who === 'string' && people.has(`${r.trip_id}:${who}`);
+  for (const r of tables.expenses) {
+    if (!onTrip(r, r.paid_by) || !r.expense_splits.every((s: { user_id: string }) => onTrip(r, s.user_id))) throw new ApiError('An expense in that backup refers to someone who is not on the trip.');
+  }
+  for (const r of tables.settlements) if (!onTrip(r, r.from_user) || !onTrip(r, r.to_user)) throw new ApiError('A payment in that backup refers to someone who is not on the trip.');
+  for (const r of tables.packing_categories) if (r.owner_id && !onTrip(r, r.owner_id)) throw new ApiError('A packing list in that backup belongs to someone who is not on the trip.');
+  for (const r of tables.packing_items) {
+    if (!categories.has(`${r.trip_id}:${r.category_id}`)) throw new ApiError('A packing item in that backup is not in any category.');
+    if (r.owner_id && !onTrip(r, r.owner_id)) throw new ApiError('A packing item in that backup belongs to someone who is not on the trip.');
+  }
   const files: BackupFile['files'] = {};
   if (isObj(j.files)) {
     for (const [id, f] of Object.entries(j.files)) {
@@ -275,6 +288,8 @@ export async function importTrips(file: BackupFile): Promise<string[]> {
 export async function eraseEverything(): Promise<void> {
   try {
     await transaction(ALL, 'readwrite', async (x) => { for (const t of TABLES) await x.clear(t); await x.clear('blobs'); await x.clear('trash'); });
-    try { localStorage.removeItem('tripnest:settings'); } catch { /* ignore */ }
+    for (const store of ['localStorage', 'sessionStorage'] as const) {
+      try { const s = window[store]; for (const k of Object.keys(s)) if (k.startsWith('tripnest:')) s.removeItem(k); } catch { /* storage unavailable */ }
+    }
   } catch (e) { throw friendly(e); }
 }

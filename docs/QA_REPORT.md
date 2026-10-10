@@ -6,7 +6,7 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 | Check | Result |
 |---|---|
 | Type check (`tsc --noEmit`) | clean |
-| Unit, storage and property tests (`npm test`, 18 files) | **283 passed**, 0 failed |
+| Unit, storage and property tests (`npm test`, 19 files) | **302 passed**, 0 failed |
 | Production build | succeeds (app script 225 kB, 73 kB gzipped; map code loads only on the Map page) |
 | Browser tests on GitHub Actions (Chromium on Linux, one job per screen size, run 38022749001) | **198 passed**, 0 failed, 0 retried; 10 skipped (checks that only apply to some screen sizes) |
 | The same browser tests on the developer PC (Microsoft Edge) | pass; Edge and Chromium differ in places (see below), so both are used |
@@ -26,6 +26,18 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - **offline (production build + service worker):** after one visit the network is cut; reload, a deep link and saving a new expense all work, and the data survives going back online; the manifest and icons are valid.
 
 ## Bugs found by this testing and fixed
+**Second code review (every source file read line by line; each fix has a test that fails on the old code and passes on the new):**
+- **Removing a traveler, and clearing a budget, had no Undo and left no trace**, so a merge could not delete them on the other phone (it would bring them back). Both now go to Recently deleted.
+- **Deleting an itinerary item, destination or reservation left its notes pointing at nothing.** The notes now go with it and return together on Undo.
+- **Restoring from Recently deleted could bring back something broken**: an expense whose payer had been removed, a payment between people no longer on the trip, a second budget for the same category. It now refuses with a plain message.
+- **A damaged or hand-edited file could import an expense paid by someone who is not on the trip** (which would break the balances). Files are now checked for references like these and refused.
+- **"Erase all data" left the saved weather and Explore results (which contain destination coordinates), device notes and drafts behind.** It now clears all of TripNest's own browser storage.
+- **Reopening Edit could show an old unsaved copy** (untouched forms were saved as drafts), and saving it would silently undo a change made elsewhere, for example by a merge. Only text the person actually typed is kept now.
+- **After moving an itinerary item with the keyboard, focus fell back to the page** (each day's section was rebuilt on every change). Focus now stays on the button.
+- **"Today", "Next up", the countdown and the to-do due dates did not move on after midnight** if the app stayed open (a phone can keep it open for days). They now refresh every minute and when the app comes to the front.
+- Switching trips quickly could show the previous trip's data; a slow weather answer could overwrite a newer one; older trip files without a cover-image field could not be archived; a 367-day trip was accepted though the limit is 366; a traveler name over 80 characters was silently dropped; a very large share count could overflow the split arithmetic (now a clear limit of 10,000); an item left outside the trip dates was headed "Day 0"; the delete message still said "can't be undone"; the offline cache version ignored file contents.
+- Read and found sound: money parsing and formatting, splits and balances, budgets, time zones, the service worker's caching rules, backup validation, the merge rules.
+
 **Feature batch (calendar reminders, install prompt, countdown and key info, password-protected backups, merge between phones):**
 - Found while testing: the password box did not take focus when it opened, so you had to click into it first (dialogs can now focus a marked field); a test asserting "restore puts everything back exactly" had to learn that a restored row is now stamped as a new change (correct: that is what lets a restore beat an earlier deletion on the other phone).
 - Merge is tested at three levels: the rules in isolation (19 tests, including 400 random edit-and-delete histories on two phones that must end up identical), against a real database with two simulated phones (13 tests: first import, update both ways, deletions, undo, documents, collisions, older files), and in the browser with two separate browser profiles passing a file through the real screens.

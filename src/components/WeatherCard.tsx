@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { friendly, rows } from '../api/api';
 import { getDevice, setTempUnit, setWeatherOn } from '../api/device';
 import { geocode } from '../api/geocode';
 import { loadTripWeather, type TripWeather } from '../api/weather';
 import { useTrip } from '../hooks/contexts';
-import { useAction } from '../hooks/hooks';
-import { browserTimeZone, formatDateShort, localDate } from '../lib/time';
+import { useAction, useToday } from '../hooks/hooks';
+import { formatDateShort } from '../lib/time';
 import { defaultUnit, describeCode, packingHints, toUnit, WEATHER_MAX_DAYS, type TempUnit, type WeatherKind } from '../lib/weather';
 import { ErrorBanner } from './ui';
 
@@ -25,18 +25,20 @@ export default function WeatherCard() {
   const [error, setError] = useState<string | null>(null);
   const find = useAction();
 
-  const today = localDate(new Date(), browserTimeZone());
+  const today = useToday();
+  const request = useRef(0);
   const lat = place?.latitude ?? null;
   const lng = place?.longitude ?? null;
   const { start_date, end_date } = data.trip;
 
   const load = useCallback(async (force = false) => {
     if (lat === null || lng === null) return;
+    const mine = ++request.current;
     setLoading(true);
     setError(null);
-    try { setWeather(await loadTripWeather(start_date, end_date, today, lat, lng, force)); }
-    catch (e) { setWeather(null); setError(friendly(e).message); }
-    finally { setLoading(false); }
+    try { const w = await loadTripWeather(start_date, end_date, today, lat, lng, force); if (mine === request.current) setWeather(w); }
+    catch (e) { if (mine === request.current) { setWeather(null); setError(friendly(e).message); } }
+    finally { if (mine === request.current) setLoading(false); }
   }, [lat, lng, start_date, end_date, today]);
 
   useEffect(() => { if (on && lat !== null) void load(); }, [on, lat, lng, load]);

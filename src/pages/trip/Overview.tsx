@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTrip } from '../../hooks/contexts';
+import { useNow } from '../../hooks/hooks';
 import { nameOf, itemLike, packingLike, expenseLike } from '../../api/adapters';
 import { sortItems } from '../../lib/itinerary';
 import { localDate, browserTimeZone } from '../../lib/time';
@@ -19,7 +20,8 @@ import { settlementLike } from '../../api/adapters';
 export default function Overview() {
   const { data, me } = useTrip();
   const { trip } = data;
-  const now = new Date();
+  const nowMs = useNow(); // refreshed every minute, so "Today" and "Next up" move on by themselves
+  const now = new Date(nowMs);
 
   const { today, next } = useMemo(() => {
     const sorted = sortItems(data.items.map(itemLike));
@@ -27,7 +29,7 @@ export default function Overview() {
     const upcoming = sorted.find((i) => (i.startAt ? Date.parse(i.startAt) >= now.getTime() : i.localDate >= localDate(now, browserTimeZone())));
     return { today: sorted.filter(isToday), next: upcoming };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.items]);
+  }, [data.items, nowMs]);
 
   const totals = totalsByCurrency(data.expenses.map((e) => ({ currency: e.currency, amountCents: e.amount_cents })));
   const mixed = Object.keys(totals).length > 1;

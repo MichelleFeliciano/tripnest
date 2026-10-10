@@ -13,7 +13,7 @@ Every method returns amounts that sum **exactly** to the total, or throws.
 | Equal | none | `base = floor(total / n)`; the leftover cents (`total - base*n`, fewer than `n`) go one each to the **last** participants. $100 / 3 = 33.33, 33.33, 33.34. |
 | Custom | amount per person (minor units) | Must sum exactly to the total, otherwise rejected (the message states how far off it is). Zero is allowed, negatives are not. |
 | Percent | basis points (50.00% = 5000) | Must sum to exactly 10000 (100.00%). Amounts by **largest remainder**. |
-| Shares | positive integers | Amounts by largest remainder (weights = shares). |
+| Shares | positive integers, at most 10,000 each | Amounts by largest remainder (weights = shares). The cap keeps total x share below 2^53, so the arithmetic is always exact. |
 
 **Largest-remainder rounding:** give everyone `floor(total * weight / sumWeights)`, then hand the remaining cents one at a time to the people with the biggest fractional remainders (ties go to the earlier participant in the list). All arithmetic is integer; `total * weight` stays below 2^53 because amounts are capped at 10^11 minor units (1 billion major units) times 10,000 basis points. Rounding therefore can never create or lose a cent. Tests check this for every total from 1 to 300 across many weightings.
 

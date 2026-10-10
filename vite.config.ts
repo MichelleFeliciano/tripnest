@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
-import { readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { Plugin } from 'vite';
 
@@ -21,7 +21,9 @@ function offlineServiceWorker(): Plugin {
     closeBundle() {
       const files = walk(outDir).map((f) => relative(outDir, f).replace(/\\/g, '/')).filter((f) => f !== 'sw.js' && !f.endsWith('.map'));
       const urls = [base, ...files.map((f) => base + f)];
-      const version = createHash('sha256').update(files.map((f) => `${f}:${statSync(join(outDir, f)).size}`).join('|')).digest('hex').slice(0, 12);
+      const hash = createHash('sha256');
+      for (const f of files) hash.update(f).update(readFileSync(join(outDir, f))); // content, not size: a same-length change must still make a new version
+      const version = hash.digest('hex').slice(0, 12);
       writeFileSync(join(outDir, 'sw.js'), `// generated at build time\nconst CACHE = 'tripnest-${version}';\nconst FILES = ${JSON.stringify(urls)};\n${SW_BODY}`);
     },
   };

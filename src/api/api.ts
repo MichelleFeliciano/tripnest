@@ -95,7 +95,7 @@ function checkTrip(t: Row) {
   need(isCode(t.default_currency), 'Choose a valid currency');
   need(Number.isInteger(t.budget_near_pct) && t.budget_near_pct >= 1 && t.budget_near_pct <= 100, 'Budget warning threshold must be 1 to 100');
   need(t.key_info == null || (typeof t.key_info === 'string' && t.key_info.length <= 2000), 'Key info is too long (2,000 characters at most)');
-  need(t.cover_image_url === null || /^https:\/\//i.test(t.cover_image_url), 'Cover image must be an https:// link');
+  need(t.cover_image_url == null || /^https:\/\//i.test(t.cover_image_url), 'Cover image must be an https:// link'); // a missing field (older files) is fine
 }
 
 export const trips = {
@@ -112,7 +112,8 @@ export const trips = {
       };
       checkTrip(row);
       const seen = new Set<string>();
-      const people = names.map((n) => n.trim()).filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()) && n.length <= 80);
+      need(names.every((n) => n.trim().length <= 80), 'Names can be up to 80 characters.');
+      const people = names.map((n) => n.trim()).filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
       need(people.length > 0, 'Add your name so the trip has at least one traveler.');
       const dests = [row.primary_destination, ...extraDestinations].map((s) => String(s ?? '').trim()).filter(Boolean);
       await transaction(ALL, 'readwrite', async (x) => {
@@ -214,14 +215,14 @@ export const travelers = {
   setMe: async (tripId: string, id: string) => {
     try {
       await transaction(['travelers'], 'readwrite', async (x) => {
-        for (const t of await x.byTrip('travelers', tripId)) await x.put('travelers', { ...t, is_me: t.id === id });
+        for (const t of await x.byTrip('travelers', tripId)) if (!!t.is_me !== (t.id === id)) await x.put('travelers', { ...t, is_me: t.id === id }); // untouched rows keep their stamp, so a merge sees only what changed
       });
     } catch (e) { throw friendly(e); }
   },
   /** Blocked while the traveler appears in any expense or payment, so balances can never silently change. */
-  remove: async (id: string) => {
+  remove: async (id: string): Promise<Deleted> => {
     try {
-      await transaction(ALL, 'readwrite', async (x) => {
+      return await transaction(ALLX, 'readwrite', async (x) => {
         const t = await x.get('travelers', id);
         need(t, 'That traveler no longer exists.');
         const all = await x.byTrip('travelers', t.trip_id);
@@ -230,16 +231,20 @@ export const travelers = {
         const inExpenses = exps.some((e) => e.paid_by === id || e.expense_splits.some((s: { user_id: string }) => s.user_id === id));
         const inPayments = (await x.byTrip('settlements', t.trip_id)).some((s) => s.from_user === id || s.to_user === id);
         need(!inExpenses && !inPayments, `${t.name} appears in expenses or payments. Delete those first, so nobody's balance changes by accident.`);
-        for (const c of await x.byTrip('packing_categories', t.trip_id)) if (c.owner_id === id) await x.del('packing_categories', c.id);
+        const removed: { table: Table; row: Row }[] = [{ table: 'travelers', row: t }];
+        const unlinks: TrashEntry['unlinks'] = [];
+        for (const c of await x.byTrip('packing_categories', t.trip_id)) if (c.owner_id === id) { removed.push({ table: 'packing_categories', row: c }); await x.del('packing_categories', c.id); }
         for (const p of await x.byTrip('packing_items', t.trip_id)) {
-          if (p.owner_id === id) await x.del('packing_items', p.id);
-          else if (p.assigned_to === id) await x.put('packing_items', { ...p, assigned_to: null });
+          if (p.owner_id === id) { removed.push({ table: 'packing_items', row: p }); await x.del('packing_items', p.id); }
+          else if (p.assigned_to === id) { unlinks.push({ table: 'packing_items', id: p.id, field: 'assigned_to', value: id }); await x.put('packing_items', { ...p, assigned_to: null }); }
         }
         await x.del('travelers', id);
         if (t.is_me) {
           const next = all.find((o) => o.id !== id)!;
           await x.put('travelers', { ...next, is_me: true });
         }
+        // kept in Recently deleted (with their personal packing list), so it can be undone and a merge knows it was deleted
+        return stash(x, t.trip_id, 'Traveler', String(t.name), removed, [], unlinks);
       });
     } catch (e) { throw friendly(e); }
   },
@@ -378,6 +383,9 @@ export const rows = {
           await unlink('documents', 'itinerary_item_id');
         }
         if (table === 'reservations') await unlink('documents', 'reservation_id');
+        // notes written about the thing go with it (and come back with it on Undo), instead of being left pointing at nothing
+        const noteScope = table === 'destinations' ? 'destination' : table === 'itinerary_items' ? 'itinerary' : table === 'reservations' ? 'reservation' : null;
+        if (noteScope) for (const n of await x.byTrip('notes', tid)) if (n.scope === noteScope && n.target_id === id) { removed.push({ table: 'notes', row: n }); await x.del('notes', n.id); }
         if (table === 'packing_categories') {
           for (const p of await x.byTrip('packing_items', tid)) if (p.category_id === id) { removed.push({ table: 'packing_items', row: p }); await x.del('packing_items', p.id); }
         }
@@ -600,14 +608,22 @@ export const trash = {
         const e = await x.trashGet(id);
         need(e, 'That item is no longer in Recently deleted.');
         if (e.kind !== 'Trip') need(await x.get('trips', e.trip_id), `The trip it belonged to (${e.trip_name}) was deleted. Restore the trip first.`);
+        const inEntry = (t: Table, rid: unknown) => e.rows.some((r) => r.table === t && r.row.id === rid);
+        const exists = async (t: Table, rid: unknown) => typeof rid === 'string' && (!!(await x.get(t, rid)) || inEntry(t, rid));
         for (const { table, row } of e.rows) {
           if (await x.get(table, row.id)) continue; // never overwrite something that exists again
+          if (table === 'notes' && row.target_id) need(await exists(row.scope === 'destination' ? 'destinations' : row.scope === 'itinerary' ? 'itinerary_items' : 'reservations', row.target_id), 'Restore what the note was about first.');
+          if (table === 'expenses') need(await exists('travelers', row.paid_by) && (await Promise.all((row.expense_splits ?? []).map((s: { user_id: string }) => exists('travelers', s.user_id)))).every(Boolean), 'Someone on that expense was removed from the trip. Restore them from Recently deleted first.');
+          if (table === 'settlements') need((await exists('travelers', row.from_user)) && (await exists('travelers', row.to_user)), 'Someone in that payment was removed from the trip. Restore them from Recently deleted first.');
+          if ((table === 'packing_categories' || table === 'packing_items') && row.owner_id) need(await exists('travelers', row.owner_id), 'Restore the traveler whose list this is first.');
+          if (table === 'budgets') need(!(await x.byTrip('budgets', row.trip_id)).some((b) => b.category === row.category), 'A budget for that category has been set again.');
           if (table === 'packing_items') need(await x.get('packing_categories', row.category_id) || e.rows.some((r) => r.table === 'packing_categories' && r.row.id === row.category_id), 'Restore its packing category first.');
           const fixed: Row = { ...row };
           for (const [field, target] of Object.entries(REFS[table] ?? {})) {
             const ref = fixed[field];
             if (ref && !(await x.get(target, ref)) && !e.rows.some((r) => r.table === target && r.row.id === ref)) fixed[field] = null;
           }
+          if (table === 'travelers' && fixed.is_me && (await x.byTrip('travelers', row.trip_id)).some((o) => o.is_me)) fixed.is_me = false; // there is already a "me"
           await x.put(table, fixed);
         }
         for (const b of e.blobs) await x.blobPut(b.id, b.blob);

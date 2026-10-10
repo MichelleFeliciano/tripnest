@@ -5,9 +5,9 @@ import type { Task } from '../../api/types';
 import { Empty, ErrorBanner, Field, ProgressBar } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { useTrip } from '../../hooks/contexts';
-import { useAction } from '../../hooks/hooks';
+import { useAction, useToday } from '../../hooks/hooks';
 import { dueState, suggestionsFor, taskProgress } from '../../lib/tasks';
-import { browserTimeZone, formatDateShort, localDate } from '../../lib/time';
+import { formatDateShort } from '../../lib/time';
 
 const DUE_TEXT = { overdue: 'Overdue', today: 'Due today', soon: 'Due soon', later: '', none: '', done: '' } as const;
 
@@ -17,7 +17,7 @@ export default function Todo() {
   const [title, setTitle] = useState('');
   const [due, setDue] = useState('');
   const { busy, error, run } = useAction();
-  const today = localDate(new Date(), browserTimeZone());
+  const today = useToday();
   const progress = taskProgress(data.tasks);
   const suggestions = suggestionsFor(data.trip.start_date, data.tasks.map((t) => t.title));
 

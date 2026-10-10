@@ -51,7 +51,7 @@ No environment variables or accounts are needed.
 
 ## Testing
 ```bash
-npm test           # 283 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
+npm test           # 302 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
 npm run build      # typecheck + production build
 npm run test:e2e   # browser tests (Edge on a Windows PC, Chromium in CI): every screen on phone/dark/desktop, real user journeys, offline mode
 ```

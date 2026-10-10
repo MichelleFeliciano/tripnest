@@ -16,6 +16,8 @@ export interface SplitResult {
 }
 
 export class SplitError extends Error {}
+/** total x share must stay below 2^53 for the arithmetic to be exact (the largest total is 1e11). */
+export const MAX_SHARES = 10_000;
 
 /** Parse "33.5" -> 3350 basis points. Max 2 decimals. */
 export function parsePercentToBp(input: string): number {
@@ -75,6 +77,7 @@ export function computeSplits(total: number, method: SplitMethod, participants: 
       const w = participants.map((p) => {
         const v = nonNegInt(p.value, 'Shares must be whole numbers greater than zero');
         if (v === 0) throw new SplitError('Shares must be whole numbers greater than zero');
+        if (v > MAX_SHARES) throw new SplitError(`Shares can be at most ${MAX_SHARES.toLocaleString('en-US')} each`);
         return v;
       });
       amounts = apportion(total, w);

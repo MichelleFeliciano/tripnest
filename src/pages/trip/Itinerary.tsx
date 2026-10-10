@@ -46,11 +46,12 @@ export default function Itinerary() {
   const edit = (i: ItineraryRow) => setForm({ open: true, editing: i });
   const close = () => { setForm({ open: false, editing: null }); setSp((p) => { const n = new URLSearchParams(p); n.delete('new'); return n; }, { replace: true }); };
 
-  const Day = ({ d }: { d: string }) => {
+  // Plain JSX (not a component defined here): a component created inside render is rebuilt on every render, which drops keyboard focus.
+  const renderDay = (d: string) => {
     const items = byDay.get(d) ?? [];
     return (
-      <section aria-labelledby={`day-${d}`}>
-        <h2 id={`day-${d}`} className="day-head">Day {dayIndex(trip.start_date, d)} · {formatDateLong(d)}</h2>
+      <section key={d} aria-labelledby={`day-${d}`}>
+        <h2 id={`day-${d}`} className="day-head">{dates.includes(d) ? `Day ${dayIndex(trip.start_date, d)}` : 'Outside the trip dates'} · {formatDateLong(d)}</h2>
         {items.length === 0 ? <p className="muted">Nothing planned yet.{<> <button className="btn btn-sm" onClick={() => { setSp((p) => { const n = new URLSearchParams(p); n.set('date', d); return n; }, { replace: true }); openNew(); }}>Add something</button></>}</p> : (
           <ul className="list">{items.map((i) => <ItemRow key={i.id} item={rowOf(i.id)} conflict={conflictFor(i.id)} canEdit onEdit={edit} move={moveFor(i.id)} />)}</ul>
         )}
@@ -80,8 +81,8 @@ export default function Itinerary() {
       {conflicts.length > 0 && <Alert kind="warn">{conflicts.length} possible schedule {conflicts.length === 1 ? 'overlap' : 'overlaps'} found. They're highlighted below. Nothing was changed.</Alert>}
       {data.items.length === 0 && <Empty title="Your itinerary is empty">{'Add a flight, hotel check-in or dinner to get started.'}</Empty>}
 
-      {view === 'timeline' && data.items.length > 0 && dates.map((d) => <Day key={d} d={d} />)}
-      {view === 'timeline' && outside.map((d) => <Day key={d} d={d} />)}
+      {view === 'timeline' && data.items.length > 0 && dates.map((d) => renderDay(d))}
+      {view === 'timeline' && outside.map((d) => renderDay(d))}
 
       {view === 'month' && (
         <>
@@ -131,7 +132,7 @@ export default function Itinerary() {
             <strong>{formatDateShort(dates[weekStart])} – {formatDateShort(dates[Math.min(weekStart + 6, dates.length - 1)])}</strong>
             <button className="btn btn-sm" disabled={weekStart + 7 >= dates.length} onClick={() => setView('week', dates[weekStart + 7])}>Next week →</button>
           </div>
-          {dates.slice(weekStart, weekStart + 7).map((d) => <Day key={d} d={d} />)}
+          {dates.slice(weekStart, weekStart + 7).map((d) => renderDay(d))}
         </>
       )}
 
@@ -144,7 +145,7 @@ export default function Itinerary() {
             </label>
             <button className="btn btn-sm" disabled={idx >= dates.length - 1} onClick={() => setView('day', addDays(date, 1))}>Next →</button>
           </div>
-          <Day d={date} />
+          {renderDay(date)}
         </>
       )}
 

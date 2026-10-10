@@ -4,7 +4,7 @@ Stored in the browser's IndexedDB database `tripnest` (version 2), plus a few pr
 
 | Store | Contents |
 |---|---|
-| `trips` | name, dates (`end >= start`, at most 366 days), status, default currency, budget warning %, notes |
+| `trips` | name, dates (`end >= start`, at most 366 days; 367 is refused), status, default currency, budget warning %, notes |
 | `travelers` | name, `is_me`, order. The people on a trip (not accounts) |
 | `destinations` | name, country, region, coordinates (both or neither), arrival/departure |
 | `itinerary_items` | date, optional start/end **instants with IANA zones**, type, location, cost (minor units), confirmation, website, contact |
@@ -29,7 +29,7 @@ Fields named `user_id`, `paid_by`, `assigned_to`, `owner_id`, `from_user`, `to_u
 - Packing items must sit in a category of the same list (shared vs a particular traveler's).
 - One budget per (trip, category).
 - A traveler who appears in any expense or payment cannot be removed (balances never change by accident); a trip keeps at least one traveler.
-- Cascades: deleting a trip removes everything in it including document files; deleting a packing category removes its items; deleting a destination/itinerary item/reservation unlinks (never deletes) what pointed at it.
+- Cascades: deleting a trip removes everything in it including document files; deleting a packing category removes its items; deleting a destination/itinerary item/reservation unlinks (never deletes) what pointed at it, except the notes written about it, which go with it and come back together on Undo; removing a traveler also removes their personal packing list and clears their assignments (all of it comes back on Undo). Restoring from Recently deleted checks that what a row depends on still exists (the payer of an expense, the thing a note is about, a second budget for the same category) and refuses with a plain message instead of restoring something half-broken.
 - Deleting anything keeps a copy in `trash` in the same transaction, so Undo and Restore bring it back with its files; restoring refuses to re-create something under a parent that is gone (for example an expense whose trip is still deleted).
 - All multi-store changes run in **one transaction** and roll back entirely on error.
 

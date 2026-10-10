@@ -1,9 +1,9 @@
 import { NavLink, Outlet, useParams } from 'react-router-dom';
 import { useTripLoader, TripProvider } from '../hooks/contexts';
+import { useToday } from '../hooks/hooks';
 import { Alert, Spinner, StatusBadge } from '../components/ui';
 import { formatDateRange, tripDuration } from '../lib/trip';
 import { countdown } from '../lib/countdown';
-import { browserTimeZone, localDate } from '../lib/time';
 
 const TABS: [string, string][] = [
   ['', 'Overview'], ['itinerary', 'Itinerary'], ['explore', 'Explore'], ['reservations', 'Reservations'], ['details', 'Travel details'], ['packing', 'Packing'], ['todo', 'To-do'],
@@ -14,6 +14,7 @@ const TABS: [string, string][] = [
 export default function TripLayout() {
   const { tripId } = useParams();
   const { ctx, error, loading, reload } = useTripLoader(tripId);
+  const today = useToday();
 
   if (loading) return <Spinner label="Opening trip…" />;
   if (error || !ctx) {
@@ -27,7 +28,7 @@ export default function TripLayout() {
   const { trip } = ctx.data;
   const { days, nights } = tripDuration(trip.start_date, trip.end_date);
   const base = `/trips/${trip.id}`;
-  const when = countdown(trip.start_date, trip.end_date, localDate(new Date(), browserTimeZone()));
+  const when = countdown(trip.start_date, trip.end_date, today);
 
   return (
     <TripProvider value={ctx}>
