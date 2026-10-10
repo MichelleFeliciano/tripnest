@@ -3,6 +3,7 @@ import { ITEM_ICONS, ITEM_LABELS } from '../lib/itinerary';
 import { formatTime, zoneAbbr } from '../lib/time';
 import { formatMoney } from '../lib/money';
 import { SafeLink } from './ui';
+import MapLinks from './MapLinks';
 
 export function timeLabel(i: ItineraryRow): { main: string; tz: string | null } {
   if (!i.start_at || !i.start_tz) return { main: 'All day', tz: null };
@@ -46,6 +47,7 @@ export default function ItemRow({ item, conflict, onEdit, canEdit, move }: { ite
         {item.cost_cents !== null && item.currency && <div className="muted">Cost: {formatMoney(item.cost_cents, item.currency)}</div>}
         {item.website && <div><SafeLink href={item.website}>Website</SafeLink></div>}
         {item.contact && <div className="muted">{item.contact}</div>}
+        <MapLinks place={{ name: item.location_name ?? item.title, address: item.address, latitude: item.latitude, longitude: item.longitude }} />
         {conflict && <div role="note"><strong>Heads up:</strong> {conflict}</div>}
       </div>
     </li>

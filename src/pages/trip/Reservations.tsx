@@ -10,6 +10,7 @@ import { useAction } from '../../hooks/hooks';
 import { COMMON_TIMEZONES, isValidTimeZone, localDate, localTime, formatTime, zoneAbbr, formatDateShort, zonedToUtc } from '../../lib/time';
 import { Fragment } from "react";
 import { Dialog, Empty, ErrorBanner, Field, SafeLink } from '../../components/ui';
+import MapLinks from '../../components/MapLinks';
 
 export const KIND_LABELS: Record<ReservationKind, string> = {
   flight: 'Flight', hotel: 'Hotel', restaurant: 'Restaurant', activity: 'Activity', car_rental: 'Rental car', other: 'Other / info',
@@ -60,6 +61,7 @@ export function ReservationCard({ r, onEdit }: { r: Reservation; onEdit?: (r: Re
         {DETAIL_FIELDS[r.kind].filter(([k]) => r.details?.[k]).map(([k, label]) => <Fragment key={k}><dt>{label}</dt><dd>{r.details[k]}</dd></Fragment>)}
       </dl>
       {r.notes && <p>{r.notes}</p>}
+      <MapLinks place={{ name: r.title, address: r.address }} />
     </div>
   );
 }

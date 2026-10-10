@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "docs:screenshots": "playwright test -c playwright.screenshots.config.ts"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

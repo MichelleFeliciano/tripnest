@@ -6,7 +6,7 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 | Check | Result |
 |---|---|
 | Type check (`tsc --noEmit`) | clean |
-| Unit, storage and property tests (`npm test`, 13 files) | **213 passed**, 0 failed |
+| Unit, storage and property tests (`npm test`, 14 files) | **228 passed**, 0 failed |
 | Production build | succeeds (app script 225 kB, 73 kB gzipped; map code loads only on the Map page) |
 | Browser tests on GitHub Actions (Chromium on Linux, one job per screen size, run 38022749001) | **198 passed**, 0 failed, 0 retried; 10 skipped (checks that only apply to some screen sizes) |
 | The same browser tests on the developer PC (Microsoft Edge) | pass; Edge and Chromium differ in places (see below), so both are used |
@@ -26,6 +26,8 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - **offline (production build + service worker):** after one visit the network is cut; reload, a deep link and saving a new expense all work, and the data survives going back online; the manifest and icons are valid.
 
 ## Bugs found by this testing and fixed
+**Housekeeping pass:** the repository was scanned for leftovers from the earlier hosted-database version (none in the code, docs or git history; only two ignore-file lines, now removed), for unused source files and unused dependencies (none), and for committed secrets (none). A LICENSE (MIT) and README screenshots were added; a small header artifact (a sliver of gradient beside the wave under the trip banner) found while taking the screenshots was fixed.
+
 **Second stylesheet pass (each finding first reproduced by a test):**
 - **A long unbroken word (a pasted link, a very long name) pushed most trip pages to 1,600 px or wider.** Page content now wraps anywhere; guarded by a test that fills every page with such strings.
 - **Body text ignored the browser's text-size setting** (it was fixed at 16 px). It now follows it, and 150% and 200% text are tested on a phone.

@@ -207,3 +207,34 @@ test('very long unbroken words never push the page sideways', async ({ page }, i
   if (!trips) wide.push('/trips: wider than the screen');
   expect(wide, `on ${info.project.name}`).toEqual([]);
 });
+
+test('itinerary items with a location get Open in Maps and Directions links; others do not', async ({ page }) => {
+  const tripId = await seedSampleTrip(page);
+  await page.goto(`/trips/${tripId}/itinerary?view=timeline`);
+  const hotel = page.locator('li.item', { hasText: 'Hotel check-in' });
+  const open = hotel.getByRole('link', { name: /Open Hotel El Convento.* in Google Maps/ });
+  await expect(open).toHaveAttribute('href', 'https://www.google.com/maps/search/?api=1&query=18.466300%2C-66.116700');
+  await expect(open).toHaveAttribute('target', '_blank');
+  await expect(open).toHaveAttribute('rel', /noopener/);
+  await expect(hotel.getByRole('link', { name: /Directions to Hotel El Convento/ })).toHaveAttribute('href', /google\.com\/maps\/dir\/\?api=1&destination=18\.466300/);
+  // nothing known about where "Free time on the plaza" is, so no links
+  await expect(page.locator('li.item', { hasText: 'Free time on the plaza' }).getByRole('link', { name: /Open in Maps|Directions/ })).toHaveCount(0);
+  // never printed in the booklet
+  await page.goto(`/trips/${tripId}/export`);
+  await page.waitForSelector('article');
+  await page.emulateMedia({ media: 'print' });
+  expect(await page.evaluate(() => [...document.querySelectorAll('.map-links')].filter((e) => getComputedStyle(e).display !== 'none').length)).toBe(0);
+});
+
+test.describe('on an iPhone', () => {
+  test.use({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1' });
+  test('the links open Apple Maps, including for a reservation with only an address', async ({ page }) => {
+    const tripId = await seedSampleTrip(page);
+    await page.goto(`/trips/${tripId}/itinerary?view=timeline`);
+    const hotel = page.locator('li.item', { hasText: 'Hotel check-in' });
+    await expect(hotel.getByRole('link', { name: /in Apple Maps/ }).first()).toHaveAttribute('href', 'https://maps.apple.com/?ll=18.466300%2C-66.116700&q=Hotel%20El%20Convento%2C%20Old%20San%20Juan');
+    await page.goto(`/trips/${tripId}/reservations`);
+    const withAddress = page.locator('.card', { hasText: 'Address' }).first();
+    await expect(withAddress.getByRole('link', { name: /Open .* in Apple Maps/ })).toHaveAttribute('href', /^https:\/\/maps\.apple\.com\/\?q=/);
+  });
+});
