@@ -37,24 +37,29 @@
   }
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--font); }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 64px); } /* room for the top bar and a sticky day heading */
+@media (max-width: 719px) { html { scroll-padding-bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); } } /* and for the tab bar */
+body { margin: 0; background: var(--bg); color: var(--text); font: 100%/1.5 var(--font); } /* 100%, not 16px: follow the text size set in the browser or phone */
 h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; margin: 0 0 .5rem; font-weight: 800; letter-spacing: -.01em; }
 h1 { font-size: 1.7rem; } h2 { font-size: 1.3rem; } h3 { font-size: 1.08rem; }
 a { color: var(--brand); }
+#main { overflow-wrap: anywhere; }
+.btn, .badge, .tabs a, .tabbar a, .topnav a, .seg button, .cal button, th, td.num, .item time, .conf { overflow-wrap: normal; }
 p { margin: .25rem 0 .75rem; }
 .muted { color: var(--muted); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+/* inside boxes that clip their overflow, draw the ring inward so it is never cut off */
+.cal button:focus-visible, .seg button:focus-visible, .table-wrap :focus-visible, .tabs a:focus-visible { outline-offset: -3px; }
 .skip { position: absolute; left: -999px; top: 0; background: var(--brand); color: var(--brand-ink); padding: .5rem 1rem; z-index: 100; }
 .skip:focus { left: 0; }
 
 /* ── top bar ── */
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 1rem; height: var(--nav-h); padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); background: var(--surface); border-bottom: 4px solid transparent; border-image: linear-gradient(90deg, var(--sun), var(--coral), var(--lagoon)) 1; }
-.brand { font-family: var(--font-display); font-weight: 800; text-decoration: none; color: var(--brand); font-size: 1.3rem; margin-right: auto; }
-.topnav { display: flex; gap: .25rem; }
+.brand { font-family: var(--font-display); font-weight: 800; text-decoration: none; color: var(--brand); font-size: 1.3rem; line-height: 1.2; flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* the title shrinks before the buttons around it do */
+.topnav { display: flex; gap: .25rem; flex: none; }
 /* phone-only top bar buttons (the text links above are hidden on phones) */
-.topbar-btn { display: none; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: .95rem; font-weight: 700; line-height: 1; cursor: pointer; text-decoration: none; }
+.topbar-btn { flex: none; display: none; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: .95rem; font-weight: 700; line-height: 1; cursor: pointer; text-decoration: none; }
 .topbar-btn:active, .topbar-btn[aria-current='page'] { background: var(--sun-soft); }
 .back-btn { margin-left: -10px; padding-left: 6px; }
 .topnav a { padding: .5rem .9rem; border-radius: 999px; text-decoration: none; color: var(--text); font-weight: 600; }
@@ -83,7 +88,7 @@ p { margin: .25rem 0 .75rem; }
 .trip-card:nth-child(3n+3) { border-top-color: var(--sun); }
 
 /* ── trip sections ── */
-.tabs { display: flex; gap: 6px; overflow-x: auto; margin: 4px -16px 16px; padding: 4px 16px 8px; scrollbar-width: thin; }
+.tabs { display: flex; gap: 6px; overflow-x: auto; margin: 4px -16px 16px; padding: 6px 16px 8px; scrollbar-width: thin; }
 .tabs a { flex: 0 0 auto; padding: .45rem .95rem; text-decoration: none; color: var(--text); font-weight: 600; border-radius: 999px; border: 2px solid transparent; white-space: nowrap; }
 .tabs a:hover { background: var(--brand-soft); }
 .tabs a[aria-current='page'] { background: var(--sun-soft); border-color: var(--sun); font-weight: 800; }
@@ -93,7 +98,6 @@ p { margin: .25rem 0 .75rem; }
   .topnav { display: none; }
   .topbar-btn { display: inline-flex; }
   .topbar { gap: .5rem; }
-  .brand { min-width: 0; }
   .tabbar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 30; display: grid; grid-template-columns: repeat(5, 1fr); height: calc(var(--tab-h) + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); border-radius: 22px 22px 0 0; box-shadow: 0 -6px 18px rgba(18, 48, 63, .08); padding: 0 max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left)); }
   .tabbar a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: .75rem; text-decoration: none; color: var(--muted); font-weight: 700; min-height: 44px; }
   .tabbar a[aria-current='page'] { color: var(--text); }
@@ -164,11 +168,11 @@ th { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-sp
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.num { white-space: nowrap; }
 @media (min-width: 720px) { td.num .muted { display: none; } } /* the note has its own column on wide screens */
-@media (max-width: 719px) { th, td { padding: 8px 6px; overflow-wrap: anywhere; } td.num { overflow-wrap: normal; } td .btn-sm { padding-inline: .55rem; } .card { padding: 14px; } .container { padding-inline: 14px; } }
+@media (max-width: 719px) { th, td { padding: 8px 6px; } td .btn-sm { padding-inline: .55rem; } .card { padding: 14px; } .container { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); } }
 @media (max-width: 360px) { /* very small phones */
   .brand { font-size: 0; } /* keep the palm tree, drop the word, so Back and Profile both fit */
   .brand span { font-size: 1.5rem; }
-  .container { padding-inline: 10px; }
+  .container { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
   .card { padding: 12px; }
   table { font-size: .88rem; }
   th, td { padding: 8px 3px; }
@@ -191,6 +195,7 @@ caption { text-align: left; font-weight: 700; padding: 0 0 8px; }
 /* ── itinerary ── */
 .day-head { position: sticky; top: var(--nav-h); background: var(--bg); padding: 8px 0; z-index: 5; border-bottom: 3px dotted var(--sun); margin: 16px 0 4px; }
 .day-head::before { content: '☀️'; content: '☀️' / ''; margin-right: .45rem; }
+.item > * { min-width: 0; }
 .item { display: grid; grid-template-columns: 76px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .item time { font-weight: 800; font-variant-numeric: tabular-nums; }
 .item .tz { display: block; font-size: .75rem; color: var(--muted); font-weight: 500; }
@@ -235,7 +240,8 @@ caption { text-align: left; font-weight: 700; padding: 0 0 8px; }
   .container { max-width: none; padding: 0; }
   .hero { background: none; padding: 0; border-radius: 0; }
   .hero::before, .hero::after, .empty::before, .day-head::before { display: none; }
-  .topbar-btn { display: none !important; }
+  .topbar-btn, .toast-region { display: none !important; }
+  .table-wrap { overflow: visible; }
   .card { box-shadow: none; border: 0; padding: 0; break-inside: avoid-page; }
   .day-head { position: static; border-bottom: 2px solid #000; }
   a { color: inherit; text-decoration: none; }

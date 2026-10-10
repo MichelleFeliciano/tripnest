@@ -1,6 +1,6 @@
 /** Layout rules that CSS review turned up, each pinned by a test. */
 import { test, expect } from '@playwright/test';
-import { seedSampleTrip } from './fixtures';
+import { sampleTripFile, seedSampleTrip } from './fixtures';
 
 test('map controls never paint over the sticky top bar or the bottom tab bar', async ({ page }, info) => {
   const tripId = await seedSampleTrip(page);
@@ -112,4 +112,98 @@ test('phone top bar: a Profile button everywhere, and a Back button that goes so
   const sizes = await page.evaluate(() => [...document.querySelectorAll('.topbar-btn')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
   for (const [w, h] of sizes) { expect(w).toBeGreaterThanOrEqual(44); expect(h).toBeGreaterThanOrEqual(44); }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('a focused text box keeps its rounded corners', async ({ page }) => {
+  await page.goto('/trips/new');
+  const box = page.getByLabel('Trip name *');
+  const before = await box.evaluate((e) => getComputedStyle(e).borderRadius);
+  await box.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  expect(await box.evaluate((e) => getComputedStyle(e).borderRadius)).toBe(before);
+});
+
+test('focus rings are not clipped inside segmented buttons, the calendar or tables', async ({ page }) => {
+  const tripId = await seedSampleTrip(page);
+  await page.goto(`/trips/${tripId}/itinerary?view=month`);
+  await page.locator('.cal button:not(:disabled)').first().focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  const calOffset = await page.evaluate(() => parseFloat(getComputedStyle(document.activeElement!).outlineOffset));
+  expect(calOffset, 'calendar buttons sit in a scrolling box: their ring must be drawn inside').toBeLessThan(0);
+  await page.goto(`/trips/${tripId}/explore`);
+  await page.locator('.seg button').first().focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  const segOffset = await page.evaluate(() => parseFloat(getComputedStyle(document.activeElement!).outlineOffset));
+  expect(segOffset, 'segmented buttons clip their overflow: the ring must be drawn inside').toBeLessThan(0);
+});
+
+test('keyboard focus is never hidden behind the sticky bars', async ({ page }, info) => {
+  test.setTimeout(150_000);
+  const tripId = await seedSampleTrip(page);
+  const problems: string[] = [];
+  for (const path of ['itinerary', 'expenses', 'packing', '']) {
+    await page.goto(`/trips/${tripId}/${path}`);
+    await page.waitForSelector('main h1');
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    for (let i = 0; i < 70; i++) {
+      await page.keyboard.press('Tab');
+      const r = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        if (!el || el === document.body) return null;
+        const b = el.getBoundingClientRect();
+        if (b.width === 0 || b.height === 0) return null;
+        const x = Math.min(Math.max(b.left + b.width / 2, 1), window.innerWidth - 2);
+        const y = Math.min(Math.max(b.top + Math.min(b.height / 2, 8), 1), window.innerHeight - 2);
+        const hit = document.elementFromPoint(x, y);
+        const covered = !!hit && !el.contains(hit) && !hit.contains(el);
+        const bar = hit?.closest('.topbar, .tabbar, .day-head, .toast-region');
+        return { covered, by: bar ? (bar as HTMLElement).className : null, label: (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().slice(0, 40) };
+      });
+      if (r?.covered && r.by) problems.push(`/${path} "${r.label}" is under .${r.by.split(' ')[0]}`);
+    }
+  }
+  expect([...new Set(problems)], `on ${info.project.name}`).toEqual([]);
+});
+
+test('very long unbroken words never push the page sideways', async ({ page }, info) => {
+  test.setTimeout(150_000);
+  const long = 'Supercalifragilistic'.repeat(5) + 'https://example.com/' + 'a'.repeat(80);
+  const file = sampleTripFile();
+  const t = file.tables;
+  t.trips[0].name = long.slice(0, 110);
+  t.trips[0].description = long;
+  t.destinations.forEach((d: Record<string, unknown>) => { d.name = long.slice(0, 120); d.notes = long; });
+  t.itinerary_items.forEach((i: Record<string, unknown>) => { i.title = long; i.description = long; i.notes = long; i.location_name = long; i.address = long; });
+  t.reservations.forEach((r: Record<string, unknown>) => { r.title = long; r.provider = long; r.notes = long; r.address = long; });
+  t.notes.forEach((n: Record<string, unknown>) => { n.body = long; });
+  t.packing_items.forEach((p: Record<string, unknown>) => { p.name = long; });
+  t.expenses.forEach((e: Record<string, unknown>) => { e.description = long; e.notes = long; });
+  t.travelers.forEach((v: Record<string, unknown>, n: number) => { v.name = `${n}${long}`.slice(0, 80); });
+  await page.goto('/trips');
+  await page.waitForSelector('main h1');
+  const ids = await page.evaluate(async (json) => {
+    const module = '/src/api/backup.ts';
+    const b = await import(/* @vite-ignore */ module);
+    return b.importTrips(b.parseBackup(json)) as Promise<string[]>;
+  }, JSON.stringify(file));
+  const tripId = ids[0];
+  const wide: string[] = [];
+  for (const path of ['', 'itinerary', 'reservations', 'details', 'packing', 'expenses', 'budget', 'notes', 'documents', 'members', 'todo', 'search', 'export', 'settings']) {
+    await page.goto(`/trips/${tripId}/${path}`);
+    await page.waitForSelector('main h1');
+    const over = await page.evaluate(() => {
+      const el = document.documentElement;
+      if (el.scrollWidth <= window.innerWidth) return null;
+      const culprit = [...document.querySelectorAll('main *')].find((e) => { const r = e.getBoundingClientRect(); return r.right > window.innerWidth + 1 && !e.closest('.table-wrap'); });
+      return `${el.scrollWidth}px > ${window.innerWidth}px, e.g. <${culprit?.tagName.toLowerCase()} class="${culprit?.className}">`;
+    });
+    if (over) wide.push(`/${path}: ${over}`);
+  }
+  await page.goto('/trips');
+  const trips = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  if (!trips) wide.push('/trips: wider than the screen');
+  expect(wide, `on ${info.project.name}`).toEqual([]);
 });

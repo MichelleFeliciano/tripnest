@@ -25,9 +25,9 @@ export default defineConfig({
     { command: `npx vite build && npx vite preview --port ${PROD} --strictPort`, port: PROD, reuseExistingServer: false, timeout: 180_000 },
   ],
   projects: [
-    { name: 'phone-375', testIgnore: '**/offline.e2e.ts', use: { baseURL: `http://localhost:${DEV}`, viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
-    { name: 'phone-320', testIgnore: ['**/offline.e2e.ts', '**/flows.e2e.ts'], use: { baseURL: `http://localhost:${DEV}`, viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
-    { name: 'phone-dark', testIgnore: ['**/offline.e2e.ts', '**/flows.e2e.ts'], use: { baseURL: `http://localhost:${DEV}`, colorScheme: 'dark', viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
+    { name: 'phone-375', testIgnore: ['**/offline.e2e.ts', '**/css-sweep.e2e.ts'], use: { baseURL: `http://localhost:${DEV}`, viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
+    { name: 'phone-320', testIgnore: ['**/offline.e2e.ts', '**/flows.e2e.ts', '**/css-sweep.e2e.ts'], use: { baseURL: `http://localhost:${DEV}`, viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
+    { name: 'phone-dark', testIgnore: ['**/offline.e2e.ts', '**/flows.e2e.ts', '**/css-sweep.e2e.ts'], use: { baseURL: `http://localhost:${DEV}`, colorScheme: 'dark', viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
     { name: 'desktop', testIgnore: '**/offline.e2e.ts', use: { baseURL: `http://localhost:${DEV}`, viewport: { width: 1280, height: 800 } } },
     { name: 'offline-pwa', testMatch: '**/offline.e2e.ts', use: { baseURL: `http://localhost:${PROD}`, viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, serviceWorkers: 'allow' } },
   ],

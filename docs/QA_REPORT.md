@@ -26,6 +26,17 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - **offline (production build + service worker):** after one visit the network is cut; reload, a deep link and saving a new expense all work, and the data survives going back online; the manifest and icons are valid.
 
 ## Bugs found by this testing and fixed
+**Second stylesheet pass (each finding first reproduced by a test):**
+- **A long unbroken word (a pasted link, a very long name) pushed most trip pages to 1,600 px or wider.** Page content now wraps anywhere; guarded by a test that fills every page with such strings.
+- **Body text ignored the browser's text-size setting** (it was fixed at 16 px). It now follows it, and 150% and 200% text are tested on a phone.
+- At large text the title wrapped out of the top bar; the title now shrinks first so Back and Profile always stay visible.
+- **Focused text boxes changed shape** (their 14 px corners snapped to 6 px); fixed.
+- **Focus rings were clipped** inside the calendar grid, segmented buttons and scrolling tables; they are now drawn inside those boxes.
+- **Keyboard focus could end up hidden behind the sticky top bar, tab bar or day heading** (five places on a phone, e.g. the Website link and Add traveler); fixed with scroll padding, guarded by a test that tabs through four pages and checks what is on top.
+- The earlier notch fix did not work on phones, because later phone rules overrode the safe-area padding; fixed.
+- Printing: wide tables were clipped by their scroll box and the undo message could print; fixed.
+- New sweeps: every page at 12 screen sizes (including landscape phones, both sides of the 720 px breakpoint, tablets and 1920 px) with the right navigation at each; print layout; Windows high-contrast mode.
+
 **Stylesheet review (every rule read; unused classes found by script):**
 - **The map painted over the sticky top bar and the bottom tab bar** when scrolling past it (Leaflet's internal layers sit at z-index 400 to 1000). Fixed; guarded by a browser test that checks what is actually under the bar.
 - **On iPhones with a home indicator the bottom tab bar lost about half its height** (the safe-area padding was taken out of a fixed height instead of added to it). Fixed. Not verified on a real iPhone: browsers on a PC report no safe area, so this one rests on reading the CSS.
