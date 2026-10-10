@@ -63,5 +63,7 @@ export default defineConfig({
   // '/' locally and on a custom domain; '/tripnest/' on GitHub Pages (set by the deploy workflow).
   base: process.env.VITE_BASE || '/',
   plugins: [react(), offlineServiceWorker()],
+  // Test output is written (and sometimes locked by OneDrive/antivirus) while the dev server runs; never watch it.
+  server: { watch: { ignored: ['**/tests/e2e/.artifacts/**', '**/test-results/**', '**/playwright-report/**'] } },
   test: { include: ['tests/**/*.test.ts'], testTimeout: 30000 },
 });

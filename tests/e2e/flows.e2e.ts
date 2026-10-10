@@ -4,7 +4,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { seedSampleTrip } from './fixtures';
+import { expectFileOpened, seedSampleTrip } from './fixtures';
 
 async function createTrip(page: Page, name = 'Lake Weekend') {
   await page.goto('/trips/new');
@@ -63,7 +63,7 @@ test('a deleted trip and a deleted document can be restored from Profile, files 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.locator('main')).toContainText('hotel-confirmation.pdf');
   const [popup] = await Promise.all([context.waitForEvent('page'), page.getByRole('button', { name: 'Open hotel-confirmation.pdf' }).click()]);
-  await expect.poll(() => popup.url(), { timeout: 10_000 }).toMatch(/^blob:/); // the file itself came back
+  await expectFileOpened(popup); // the file itself came back
 
   // delete the whole trip, then restore it from Profile
   await page.goto(`/trips/${tripId}/settings`);
@@ -259,7 +259,7 @@ test('save one trip to a file, delete it, import the file: the trip returns as a
   await expect(page.locator('main')).toContainText('No trips yet');
 
   await page.locator('input[type=file]').first().setInputFiles(file);
-  await expect(page.getByRole('alert').or(page.getByRole('status'))).toContainText(/Added 1 trip/);
+  await expect(page.locator('.alert-success')).toContainText(/Added 1 trip/);
   await page.getByRole('link', { name: 'Share Me' }).click();
   await page.getByRole('link', { name: 'Expenses' }).last().click();
   await expect(page.locator('main')).toContainText('$20.00');

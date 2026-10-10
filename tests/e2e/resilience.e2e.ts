@@ -1,6 +1,6 @@
 /** Things that only a real browser can prove: crash recovery and opening a stored document. */
 import { test, expect } from '@playwright/test';
-import { seedSampleTrip } from './fixtures';
+import { expectFileOpened, seedSampleTrip } from './fixtures';
 
 test.beforeEach(({ page: _page }, info) => {
   void _page;
@@ -34,6 +34,6 @@ test('Open on a stored document opens it in a new tab without a false "blocked" 
   await page.goto(`/trips/${tripId}/documents`);
   await expect(page.locator('main')).toContainText('hotel-confirmation.pdf');
   const [popup] = await Promise.all([context.waitForEvent('page'), page.getByRole('button', { name: 'Open hotel-confirmation.pdf' }).click()]);
-  await expect.poll(() => popup.url(), { timeout: 10_000 }).toMatch(/^blob:/);
+  await expectFileOpened(popup);
   await expect(page.getByRole('alert')).toHaveCount(0);
 });

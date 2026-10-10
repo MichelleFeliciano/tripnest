@@ -120,3 +120,13 @@ export async function seedSampleTrip(page: Page): Promise<string> {
   }, JSON.stringify(sampleTripFile()));
   return ids[0];
 }
+
+/**
+ * A stored file opened in a new tab must really arrive. Browsers with a PDF viewer (Edge) navigate the tab to a blob: URL;
+ * headless Chromium has no viewer, so the same PDF becomes a download instead. Either proves the file came out of storage.
+ */
+export async function expectFileOpened(popup: Page): Promise<void> {
+  const opened = (async () => { for (let i = 0; i < 100; i++) { if (popup.url().startsWith('blob:')) return 'blob'; await popup.waitForTimeout(100); } throw new Error(`The new tab never opened the file (it stayed at ${popup.url()})`); })();
+  const downloaded = popup.waitForEvent('download', { timeout: 10_000 }).then(() => 'download');
+  await Promise.any([opened, downloaded]);
+}

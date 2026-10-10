@@ -122,7 +122,7 @@ test('phone: money tables show every amount without sideways scrolling', async (
   const r = await page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
     const cut = [...document.querySelectorAll('td.num')].filter((c) => { const b = c.getBoundingClientRect(); return b.width > 0 && b.right > vw - 4; }).map((c) => c.textContent);
-    const scrolling = [...document.querySelectorAll('.table-wrap')].filter((w) => w.scrollWidth > w.clientWidth + 1 && (w as HTMLElement).offsetParent).map((w) => w.querySelector('caption')?.textContent);
+    const scrolling = [...document.querySelectorAll('.table-wrap')].filter((w) => w.scrollWidth > w.clientWidth + 1 && (w as HTMLElement).offsetParent).map((w) => `${w.querySelector('caption')?.textContent}: content ${w.scrollWidth}px in ${w.clientWidth}px, widest cell: ${[...w.querySelectorAll('th,td')].sort((a, b) => b.scrollWidth - a.scrollWidth)[0]?.textContent?.slice(0, 40)}`);
     return { cut, scrolling };
   });
   expect(r.cut, 'amounts touching/cut by the screen edge').toEqual([]);

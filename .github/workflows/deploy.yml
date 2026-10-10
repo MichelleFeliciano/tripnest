@@ -58,6 +58,7 @@ jobs:
         with:
           name: e2e-failures-${{ matrix.project }}
           path: tests/e2e/.artifacts
+          include-hidden-files: true # the folder is .artifacts, which upload-artifact skips by default
           retention-days: 7
 
   deploy:
