@@ -1,6 +1,7 @@
 /** Calendar reminders, password-protected backups, merge updates, Android install prompt, trip countdown and key info card. */
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import AxeBuilder from '@axe-core/playwright';
 import { seedSampleTrip } from './fixtures';
 
 test('the calendar file has reminders only for timed items, and none when switched off', async ({ page }, info) => {
@@ -215,4 +216,46 @@ test('two phones keep one trip in step by passing files: first import, an update
     await a.ctx.close();
     await b.ctx.close();
   }
+});
+
+test('the new dialogs and cards pass the accessibility scan, fit the screen, and trap nothing', async ({ page }) => {
+  test.setTimeout(120_000);
+  const tripId = await seedSampleTrip(page);
+  const scan = async (what: string) => {
+    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+    expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${what}: ${v.id}: ${v.help}`)).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${what} sideways scroll`).toBe(true);
+  };
+
+  await page.goto(`/trips/${tripId}`);
+  await page.waitForSelector('#ki-h');
+  await scan('overview with key info and countdown');
+  await page.getByRole('region', { name: 'Key info' }).getByRole('button', { name: 'Add' }).click();
+  await expect(page.getByRole('dialog', { name: 'Key info' })).toBeVisible();
+  await scan('key info dialog');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Key info' })).toBeHidden();
+
+  await page.goto('/profile');
+  await page.getByLabel('Protect with a password').check();
+  await page.getByLabel('Password', { exact: true }).fill('correct horse');
+  await scan('profile with password options');
+
+  // importing a file for a trip that is already here
+  await page.goto('/trips');
+  const sample = (await import('./fixtures')).sampleTripFile();
+  const pick = (name: string) => page.locator('input[type=file]').first().setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sample)) });
+  await pick('trip.json'); // new to this device: added, keeping its identity
+  await expect(page.getByText(/Added 1 trip from the file/)).toBeVisible();
+  await pick('again.json'); // now it is the same trip
+  await expect(page.getByRole('dialog', { name: 'You already have this trip' })).toBeVisible();
+  await scan('import dialog');
+  await page.keyboard.press('Escape');
+
+  // opening a protected file
+  const locked = await page.evaluate(async (json) => { const m = '/src/api/crypto.ts'; const c = await import(/* @vite-ignore */ m); return c.encryptBackup(json, 'correct horse', 1000) as Promise<string>; }, JSON.stringify(sample));
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'locked.json', mimeType: 'application/json', buffer: Buffer.from(locked) });
+  await expect(page.getByRole('dialog', { name: 'This file is password protected' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'This file is password protected' }).getByLabel('Password')).toBeFocused(); // typing can start straight away
+  await scan('password dialog');
 });

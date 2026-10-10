@@ -40,7 +40,10 @@ export function Dialog({ open, onClose, title, children }: { open: boolean; onCl
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
+    if (open && !d.open) {
+      d.showModal();
+      d.querySelector<HTMLElement>('[data-autofocus]')?.focus(); // a field that should be ready to type in as soon as the dialog opens
+    }
     if (!open && d.open) d.close();
   }, [open]);
   return (

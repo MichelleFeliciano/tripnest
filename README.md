@@ -32,8 +32,11 @@ TripNest is a static web app. Trips are stored in your browser (IndexedDB) on th
 - **To-do list** before you go (due dates, overdue flags, one-tap ideas) and **Copy this trip** as a template for next time.
 - **Weather** for your trip days (forecast, or last year's weather as a labelled guide for trips further out), plus packing ideas. Optional.
 - **Undo** after deletes and a 30-day **Recently deleted** list.
+- **Key info** card and a **countdown** on each trip: flight numbers, the hotel address and emergency contacts one tap away, offline.
+- **Two phones, one trip**: send an updated trip file and the other phone offers to merge it (newer edit wins, deletions travel, nothing is lost without an undo), no accounts or server.
 - **Map**, **search**, **printable booklet / PDF**, **.ics calendar export**.
-- **Back up / restore / import a trip file / erase everything**, share a trip or backup through the phone share sheet, and a gentle backup reminder.
+- **Back up / restore / import a trip file / erase everything**, optional **password protection** for backups and trip files, share through the phone share sheet, and a gentle backup reminder.
+- **Calendar export** with optional reminders (.ics), and an **Install** button on Android.
 - **Works offline** after the first visit, and installs to the home screen.
 
 ## Stack
@@ -48,7 +51,7 @@ No environment variables or accounts are needed.
 
 ## Testing
 ```bash
-npm test           # 228 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
+npm test           # 283 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
 npm run build      # typecheck + production build
 npm run test:e2e   # browser tests (Edge on a Windows PC, Chromium in CI): every screen on phone/dark/desktop, real user journeys, offline mode
 ```
@@ -61,4 +64,4 @@ GitHub Pages, deployed by Actions on every push to `main`. Every push and pull r
 [MIT](LICENSE) © 2026 Michelle Feliciano
 
 ## Docs
-[Architecture](docs/ARCHITECTURE.md) · [Data](docs/DATABASE.md) · [Expense logic](docs/EXPENSE_LOGIC.md) · [Privacy & security](docs/SECURITY.md) · [Data API](docs/API.md) · [Deployment](docs/DEPLOYMENT.md) · [QA report](docs/QA_REPORT.md)
+[Architecture](docs/ARCHITECTURE.md) · [Data](docs/DATABASE.md) · [Expense logic](docs/EXPENSE_LOGIC.md) · [Privacy & security](docs/SECURITY.md) · [Data API](docs/API.md) · [Deployment](docs/DEPLOYMENT.md) · [QA report](docs/QA_REPORT.md) · [Testing on a real phone](docs/DEVICE_CHECKLIST.md)

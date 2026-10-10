@@ -20,7 +20,7 @@ There is no web API. The screens talk to a small TypeScript module over the on-d
 `exportData({ tripId?, includeFiles })` · `parseBackup(text)` (validates) · `restoreAll(file)` · `importTrips(file)` (copies, new ids) · `eraseEverything()` · `backupFileName(name?)`
 
 ## Other modules
-`src/api/copyTrip.ts`: `copyTrip(tripId, options)` and the pure `makeTemplate`. `src/api/weather.ts`: `loadTripWeather(...)` (Open-Meteo, cached, only after opt-in). `src/api/device.ts`: per-device notes (last backup, snooze, weather on, temperature unit). `src/components/share.ts`: `shareOrDownload`.
+`src/api/copyTrip.ts`: `copyTrip(tripId, options)` and the pure `makeTemplate`. `src/api/weather.ts`: `loadTripWeather(...)` (Open-Meteo, cached, only after opt-in). `src/api/merge.ts`: `planImport(file)` (a preview of what importing would do), `importFile(file, "merge" | "copy")`; the rules are in `src/lib/merge.ts`. `src/api/crypto.ts`: `encryptBackup`, `decryptBackup`, `isEncryptedBackup` (password protection); `makeBackupText` and `openBackup` in `backup.ts` use them. `src/api/device.ts`: per-device notes (last backup, snooze, weather on, temperature unit). `src/components/share.ts`: `shareOrDownload`.
 
 ## `src/api/settings.ts`
 `getSettings()` / `saveSettings()`: display name and home time zone, kept in localStorage.

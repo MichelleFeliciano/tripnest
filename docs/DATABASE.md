@@ -35,7 +35,19 @@ Fields named `user_id`, `paid_by`, `assigned_to`, `owner_id`, `from_user`, `to_u
 
 ## Backup file (`tripnest-*.json`)
 `{ app: "tripnest", format: 1, exportedAt, settings?, tables: { <store>: [...] }, files: { <documentId>: { type, data(base64) } } }`.
-Opening one validates structure, ids, trips, itinerary dates/zones, that every expense's splits add up, payments, and that nothing belongs to a missing trip. Invalid files are refused and change nothing. *Restore* replaces everything on the device; *Import a trip file* adds copies with fresh ids and remapped links, never overwriting.
+A backup can also be **password protected**: the file is then `{ app, format, encrypted: true, kdf: "PBKDF2-SHA256", iterations, salt, iv, data }` where `data` is the whole backup encrypted with AES-256-GCM (see SECURITY.md). Opening one asks for the password first. Opening one validates structure, ids, trips, itinerary dates/zones, that every expense's splits add up, payments, and that nothing belongs to a missing trip. Invalid files are refused and change nothing. *Restore* replaces everything on the device; *Import a trip file* adds copies with fresh ids and remapped links, never overwriting.
+
+## Keeping one trip in step on two phones (merge)
+Every saved row carries `updated_at`, set by the storage layer on each save (`Tx.put`). Restoring a backup, importing and merging use `putAsIs`, which keeps a row's own stamp. A single-trip file also carries `tombstones`: what was deleted from that trip recently (taken from Recently deleted, so up to 30 days).
+
+Importing a file (`src/api/merge.ts`, rules in `src/lib/merge.ts`, both tested):
+- A trip this device does not have is added **keeping its ids**, so later files for it can be matched. If any of its rows would collide with rows stored under another trip, it is added as a separate copy instead.
+- A trip this device already has can be **updated** or added as a **separate copy** (the person chooses, after a preview of how many rows would be added, changed or removed).
+- Update rules: for a row on both sides the **newer** `updated_at` wins (ties, or no stamp, keep this device's row, so a merge never changes anything on a guess). A row only the file has is added unless this device deleted it more recently. A deletion recorded in the file removes the row here unless this device changed it more recently. Which traveler is "me" is never changed. A traveler is never removed while an expense, payment, packing list or assignment still refers to them. Afterwards, links to rows that no longer exist are cleared (or the dependent row is dropped), as a normal delete does.
+- Rows an update removes go to Recently deleted (kind "Update") and can be restored.
+- It relies on the two phones' clocks being roughly right: if one phone's clock is a day wrong, its edits can wrongly win or lose.
+
+`trips.key_info` (optional text, at most 2,000 characters) is the pinned "Key info" note; it is left out when a trip is copied as a template.
 
 ## Storage limits
 Browsers typically allow hundreds of MB to several GB. Documents are limited to 10 MB each. The Profile page shows usage and whether the browser has promised not to evict the data (TripNest asks for this). Download backups regularly.

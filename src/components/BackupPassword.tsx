@@ -40,7 +40,7 @@ export function usePasswordPrompt() {
     <Dialog open={state !== null} onClose={() => finish(null)} title="This file is password protected">
       <form onSubmit={submit}>
         <Field label="Password" error={state?.wasWrong ? 'That password did not open the file. Check it and try again.' : undefined}>
-          {(id) => <input id={id} type="password" autoComplete="current-password" autoFocus value={value} onChange={(e) => setValue(e.target.value)} />}
+          {(id) => <input id={id} type="password" autoComplete="current-password" data-autofocus value={value} onChange={(e) => setValue(e.target.value)} />}
         </Field>
         <div className="row"><button className="btn btn-primary" disabled={!value}>Open</button><button type="button" className="btn" onClick={() => finish(null)}>Cancel</button></div>
       </form>

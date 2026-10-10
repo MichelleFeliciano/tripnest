@@ -6,7 +6,7 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 | Check | Result |
 |---|---|
 | Type check (`tsc --noEmit`) | clean |
-| Unit, storage and property tests (`npm test`, 14 files) | **228 passed**, 0 failed |
+| Unit, storage and property tests (`npm test`, 18 files) | **283 passed**, 0 failed |
 | Production build | succeeds (app script 225 kB, 73 kB gzipped; map code loads only on the Map page) |
 | Browser tests on GitHub Actions (Chromium on Linux, one job per screen size, run 38022749001) | **198 passed**, 0 failed, 0 retried; 10 skipped (checks that only apply to some screen sizes) |
 | The same browser tests on the developer PC (Microsoft Edge) | pass; Edge and Chromium differ in places (see below), so both are used |
@@ -26,6 +26,13 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - **offline (production build + service worker):** after one visit the network is cut; reload, a deep link and saving a new expense all work, and the data survives going back online; the manifest and icons are valid.
 
 ## Bugs found by this testing and fixed
+**Feature batch (calendar reminders, install prompt, countdown and key info, password-protected backups, merge between phones):**
+- Found while testing: the password box did not take focus when it opened, so you had to click into it first (dialogs can now focus a marked field); a test asserting "restore puts everything back exactly" had to learn that a restored row is now stamped as a new change (correct: that is what lets a restore beat an earlier deletion on the other phone).
+- Merge is tested at three levels: the rules in isolation (19 tests, including 400 random edit-and-delete histories on two phones that must end up identical), against a real database with two simulated phones (13 tests: first import, update both ways, deletions, undo, documents, collisions, older files), and in the browser with two separate browser profiles passing a file through the real screens.
+- Password protection: round trips (accents, emoji, 2 MB), wrong password, tampering, crafted files, Unicode-form differences, and the full lock, erase, restore flow in a browser.
+- Accessibility scan (light, dark, phone) of the new screens: key info dialog, password options, import preview, password prompt.
+- Still not verified: a real phone (see [DEVICE_CHECKLIST.md](DEVICE_CHECKLIST.md)).
+
 **Housekeeping pass:** the repository was scanned for leftovers from the earlier hosted-database version (none in the code, docs or git history; only two ignore-file lines, now removed), for unused source files and unused dependencies (none), and for committed secrets (none). A LICENSE (MIT) and README screenshots were added; a small header artifact (a sliver of gradient beside the wave under the trip banner) found while taking the screenshots was fixed.
 
 **Second stylesheet pass (each finding first reproduced by a test):**
@@ -83,8 +90,8 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - **Storage eviction behaviour** differs by browser; the persistence request is best-effort and cannot be tested automatically.
 
 ## Known limitations
-- No live sharing between devices (use backup / trip files). Each device is its own copy.
-- Anyone who can unlock the device and open the browser profile can read the trips; backup files are not encrypted.
+- No live sharing between devices. Phones keep a trip in step by passing trip files, and importing an updated file offers to merge (newer edit wins). It depends on both phones' clocks being roughly right, and a deletion only travels for 30 days (while it is still in Recently deleted).
+- Anyone who can unlock the device and open the browser profile can read the trips. Backup files are only encrypted if you choose a password, and a forgotten password cannot be recovered.
 - Clearing browser data deletes trips unless a backup exists (the app warns and offers backups).
 - Itinerary items are reordered with up/down buttons (and only among items at the same time, or all-day items); there is no drag-and-drop. No push notifications, currency conversion or AI suggestions (the earlier optional AI feature required a server and was removed).
 - A reservation entered with a date but no time is stored at midnight local time.

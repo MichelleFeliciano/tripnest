@@ -18,7 +18,7 @@ TripNest has **no server, no accounts and no analytics**. Your trips, expenses a
 ## Limits you should know about
 - **Anyone who can open this browser profile can read the trips.** Use your phone's lock screen. There is no app-level password.
 - **Clearing site data deletes your trips.** Download a backup now and then (Profile → Download a backup). TripNest asks the browser for persistent storage, which most browsers grant for installed or frequently used sites, but it is not guaranteed.
-- **Backup files are not encrypted.** They contain everything in the trip, including confirmation numbers and (optionally) documents. Store and share them like any private document.
+- **Backup files are not encrypted unless you choose a password.** Tick "Protect with a password" when saving a backup or trip file to lock it with AES-256-GCM, using a key made from your password with PBKDF2 (SHA-256, 600,000 rounds, random salt) by the browser's built-in Web Crypto (no extra libraries). A wrong password or a tampered file is refused. **A forgotten password cannot be recovered**, by anyone: it is never stored or sent. Protection needs a secure (https) page. The "Back up now" reminder button makes an unprotected backup; use Profile for a protected one. An unprotected file contains everything in the trip, including confirmation numbers and (optionally) documents: store and share it like any private document.
 - **A CSP header** is not set (GitHub Pages cannot send custom headers). The app does not load third-party scripts, and the only third-party hosts it contacts are the three OpenStreetMap services above.
 - There is no way to share a trip live, and therefore no sharing permissions to get wrong.
 

@@ -34,7 +34,7 @@ export default function KeyInfoCard() {
         <form onSubmit={save}>
           <ErrorBanner message={error} />
           <Field label="What should be easy to find?" hint={`Don't put passport, ID or card numbers here. ${text.length} / ${MAX}`}>
-            {(id, d) => <textarea id={id} aria-describedby={d} value={text} onChange={(e) => setText(e.target.value)} maxLength={MAX} rows={8} placeholder={'Flight: WN 1234, gate B7\nHotel: Hotel El Convento, 100 Calle del Cristo, +1 787 555 0199\nEmergency: Mom +1 512 555 0123'} />}
+            {(id, d) => <textarea id={id} aria-describedby={d} data-autofocus value={text} onChange={(e) => setText(e.target.value)} maxLength={MAX} rows={8} placeholder={'Flight: WN 1234, gate B7\nHotel: Hotel El Convento, 100 Calle del Cristo, +1 787 555 0199\nEmergency: Mom +1 512 555 0123'} />}
           </Field>
           <div className="row"><button className="btn btn-primary" disabled={busy}>Save</button><button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button></div>
         </form>
