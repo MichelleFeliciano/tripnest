@@ -1,20 +1,20 @@
-name: Deploy to GitHub Pages
+name: Test and deploy to GitHub Pages
 
+# Every push and pull request is tested. Only a push to main is deployed, and only if every test passed.
 on:
   push:
-    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Typecheck, unit/storage/property tests, and the production build.
   build:
     runs-on: ubuntu-latest
     steps:
@@ -24,22 +24,49 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Never deploy something that fails its tests (includes the database security tests).
       - run: npm test
       - run: npm run build
         env:
           # The site is served from a sub-path on GitHub Pages. No keys or secrets are needed.
           VITE_BASE: /${{ github.event.repository.name }}/
-      # GitHub Pages has no SPA fallback: serve the app for deep links like /invite/<token>.
+      # GitHub Pages has no SPA fallback: serve the app for deep links.
       - run: cp dist/index.html dist/404.html
       - run: touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
-  deploy:
-    needs: build
+  # The real app in a real browser: every screen on phone and desktop sizes, user journeys, accessibility, offline.
+  e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [phone-375, phone-320, phone-dark, desktop, offline-pwa]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-failures-${{ matrix.project }}
+          path: tests/e2e/.artifacts
+          retention-days: 7
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [build, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
