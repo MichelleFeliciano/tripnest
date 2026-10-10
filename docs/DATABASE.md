@@ -1,6 +1,6 @@
 # Data model (on-device)
 
-Stored in the browser's IndexedDB database `tripnest` (version 1), plus a few preferences in localStorage (`tripnest:settings`). One object store per table, keyed by `id` (UUID); every table except `trips` has an index on `trip_id`. A separate `blobs` store holds uploaded document files.
+Stored in the browser's IndexedDB database `tripnest` (version 2), plus a few preferences in localStorage (`tripnest:settings` for your name and time zone; `tripnest:device` for per-device notes such as the last backup date and whether weather is on; short-lived caches for weather and Explore results). One object store per table, keyed by `id` (UUID); every table except `trips` has an index on `trip_id`. A separate `blobs` store holds uploaded document files.
 
 | Store | Contents |
 |---|---|
@@ -14,6 +14,8 @@ Stored in the browser's IndexedDB database `tripnest` (version 1), plus a few pr
 | `settlements` | recorded payments between two travelers |
 | `budgets` | one row per (trip, category); `category = null` is the total |
 | `notes` | scope trip/destination/itinerary/reservation + target |
+| `tasks` | the pre-trip to-do list: title, optional due date, done, notes (added in version 2) |
+| `trash` | "Recently deleted": whatever a delete removed (rows, files and links to restore), kept 30 days, never included in backups (added in version 2) |
 | `documents` | file metadata; the file itself is in `blobs` under the same id |
 
 Fields named `user_id`, `paid_by`, `assigned_to`, `owner_id`, `from_user`, `to_user` all hold a **traveler id**.
@@ -28,6 +30,7 @@ Fields named `user_id`, `paid_by`, `assigned_to`, `owner_id`, `from_user`, `to_u
 - One budget per (trip, category).
 - A traveler who appears in any expense or payment cannot be removed (balances never change by accident); a trip keeps at least one traveler.
 - Cascades: deleting a trip removes everything in it including document files; deleting a packing category removes its items; deleting a destination/itinerary item/reservation unlinks (never deletes) what pointed at it.
+- Deleting anything keeps a copy in `trash` in the same transaction, so Undo and Restore bring it back with its files; restoring refuses to re-create something under a parent that is gone (for example an expense whose trip is still deleted).
 - All multi-store changes run in **one transaction** and roll back entirely on error.
 
 ## Backup file (`tripnest-*.json`)

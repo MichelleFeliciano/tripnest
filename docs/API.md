@@ -12,9 +12,15 @@ There is no web API. The screens talk to a small TypeScript module over the on-d
 | `packing` | `applyTemplate(tripId, template, shared, ownerId)`, `toggle(id, packed)` |
 | `expenses` | `save(tripId, expenseId \| null, expense, splits)`, `remove(id)`, `settle(...)`, `removeSettlement(id)` |
 | `documents` | `upload(tripId, file, link)`, `openUrl(id)`, `remove(doc)` |
+| `tasks` | `add(tripId, title, dueDate)`, `toggle(id, done)`, `update(id, patch)`, `remove(id)` |
+| `itinerary` | `reorder(updates)`: new manual order for items that sort as equals (`moveWithinGroup` in `lib/itinerary` computes it) |
+| `trash` | `list()`, `restore(id)`, `discard(id)`, `empty()`, `purgeOld()`. Every delete function returns `{ id, summary }` so the UI can offer Undo |
 
 ## `src/api/backup.ts`
 `exportData({ tripId?, includeFiles })` · `parseBackup(text)` (validates) · `restoreAll(file)` · `importTrips(file)` (copies, new ids) · `eraseEverything()` · `backupFileName(name?)`
+
+## Other modules
+`src/api/copyTrip.ts`: `copyTrip(tripId, options)` and the pure `makeTemplate`. `src/api/weather.ts`: `loadTripWeather(...)` (Open-Meteo, cached, only after opt-in). `src/api/device.ts`: per-device notes (last backup, snooze, weather on, temperature unit). `src/components/share.ts`: `shareOrDownload`.
 
 ## `src/api/settings.ts`
 `getSettings()` / `saveSettings()`: display name and home time zone, kept in localStorage.

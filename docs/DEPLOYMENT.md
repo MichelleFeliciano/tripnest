@@ -3,7 +3,12 @@
 TripNest is a static site. There is no database, server or secret to configure. Hosting is free on GitHub Pages.
 
 ## How it is deployed here
-`.github/workflows/deploy.yml` runs on every push to `main`:
+`.github/workflows/deploy.yml` runs on every push and pull request. Jobs:
+- **build**: `npm ci`, `npm test`, the production build, and the Pages bundle
+- **e2e**: the Playwright browser tests, one job per project (phone-375, phone-320, phone-dark, desktop, offline-pwa) in parallel, using Chromium on the runner. Failure screenshots and traces are kept for 7 days as workflow artifacts
+- **deploy**: only for a push to `main`, and only after **build and every e2e job passed**
+
+The build job's steps:
 1. `npm ci`
 2. `npm test` (the unit and storage tests; a failure stops the deploy)
 3. `npm run build` with `VITE_BASE=/<repo>/` (the site lives under a sub-path on GitHub Pages)

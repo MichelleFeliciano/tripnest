@@ -6,9 +6,10 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 | Check | Result |
 |---|---|
 | Type check (`tsc --noEmit`) | clean |
-| Unit, storage and property tests (`npm test`, 7 files) | **138 passed**, 0 failed |
+| Unit, storage and property tests (`npm test`, 13 files) | **213 passed**, 0 failed |
 | Production build | succeeds (app script 225 kB, 73 kB gzipped; map code loads only on the Map page) |
-| Browser tests (`npm run test:e2e`, Microsoft Edge) | **146 passed**, 0 failed, 10 skipped (checks that only apply to some screen sizes) |
+| Browser tests on GitHub Actions (Chromium on Linux, one job per screen size, run 38022749001) | **198 passed**, 0 failed, 0 retried; 10 skipped (checks that only apply to some screen sizes) |
+| The same browser tests on the developer PC (Microsoft Edge) | pass; Edge and Chromium differ in places (see below), so both are used |
 
 ## What is tested
 **Logic (unit):** trip dates and duration; time zones including the Chicagoâ†’Puerto Rico flight, daylight-saving gaps/ambiguity, half-hour zones; itinerary ordering and cross-zone conflicts; packing progress, templates, privacy of personal lists; budgets and thresholds; search; Explore query building, ranking and junk filtering; ICS output (structure, line folding, escaping, UTC instants, all-day events); money parsing (including `12,50`), every split method with property tests over thousands of totals, balances, settlement simplification, partial and over-payments, multiple currencies.
@@ -21,9 +22,15 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - every screen and dialog at **375 px, 320 px, 375 px dark mode and desktop**: no sideways scrolling, nothing sticking out, tap targets â‰¥ 32 px on phones, no console errors, automated accessibility scan (axe, WCAG 2.2 AA) with zero serious or critical findings, in light and dark;
 - phone navigation and "money tables show every amount without scrolling" regression checks;
 - **user journeys:** create a trip â†’ itinerary item â†’ reload; invalid input refused; custom-split expense â†’ balances â†’ partial payment â†’ reload â†’ undo payment; $100 split three ways is 33.33/33.33/33.34; packing templates, personal lists per traveler, packed items survive reload; **backup â†’ erase everything â†’ restore**; a damaged backup is refused and changes nothing; delete a trip;
+- **to-do list, copy-as-template, undo / Recently deleted (files included), reordering, backup reminder, Home Screen tip, share sheet (with a stand-in), weather (mocked)**, each with unit tests and a browser journey, plus an accessibility scan of the new banners and the weather card;
 - **offline (production build + service worker):** after one visit the network is cut; reload, a deep link and saving a new expense all work, and the data survives going back online; the manifest and icons are valid.
 
 ## Bugs found by this testing and fixed
+**First run on GitHub's servers (a different browser and fonts than the developer PC):**
+- **The Expenses table scrolled sideways on phones** (22 px too wide at 375 px) with Linux's wider fonts, though it fit on Windows. Table cells on phones can now break long words and use tighter buttons.
+- Two tests raced a slower machine (they moved on before an erase or restore had finished, or looked for the opened file after it had already downloaded). Fixed in the tests; the app was right.
+- Headless Chromium has no PDF viewer, so opening a stored PDF downloads it; the tests accept either outcome.
+
 **Code review round (found by reading the code and probing in a real browser):**
 - **Backups failed in real browsers when they included two or more documents** ("The transaction has finished"): files were converted inside the database transaction, which a browser closes as soon as slow work happens. The in-memory test database had hidden it. Fixed; now guarded by a real-browser test.
 - **Opening a document always showed a false "blocked" message** (the browser returns nothing when the new tab is opened with the noopener option). Fixed.
@@ -46,8 +53,9 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - "1 nights" grammar.
 
 ## Not verified
-- **Real devices.** All browser tests use Edge (Chromium) emulation. iPhone Safari and real Android phones have not been tried, nor touch gestures, notches, or the home-screen install flow itself.
+- **Real devices.** All browser tests use Chromium-family emulation (Edge locally, Chromium in CI). iPhone Safari and real Android phones have not been tried, nor touch gestures, notches, or the home-screen install flow itself.
 - **Screen readers** (VoiceOver/TalkBack/NVDA). Only the automated axe scan was run.
+- **Weather** (Open-Meteo) was tested against mocked replies shaped like Open-Meteo's documented format; the live service has not been called by the tests. **The share sheet** was tested with a stand-in, because desktop browsers have none: it has not been tried on a real iPhone or Android phone.
 - **Map tiles, "Find coordinates" and Explore** call free OpenStreetMap services; they were exercised against the live services earlier in development, but the automated tests block them for determinism.
 - **Print/PDF output** was not inspected visually.
 - **Storage eviction behaviour** differs by browser; the persistence request is best-effort and cannot be tested automatically.
@@ -56,7 +64,7 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - No live sharing between devices (use backup / trip files). Each device is its own copy.
 - Anyone who can unlock the device and open the browser profile can read the trips; backup files are not encrypted.
 - Clearing browser data deletes trips unless a backup exists (the app warns and offers backups).
-- No drag-and-drop reordering, push notifications, weather, currency conversion or AI suggestions (the earlier optional AI feature required a server and was removed).
+- Itinerary items are reordered with up/down buttons (and only among items at the same time, or all-day items); there is no drag-and-drop. No push notifications, currency conversion or AI suggestions (the earlier optional AI feature required a server and was removed).
 - A reservation entered with a date but no time is stored at midnight local time.
 
 ## History

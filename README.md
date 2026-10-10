@@ -33,14 +33,14 @@ No environment variables or accounts are needed.
 
 ## Testing
 ```bash
-npm test           # 138 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
+npm test           # 213 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
 npm run build      # typecheck + production build
-npm run test:e2e   # browser tests in Microsoft Edge: every screen on phone/dark/desktop, real user journeys, offline mode
+npm run test:e2e   # browser tests (Edge on a Windows PC, Chromium in CI): every screen on phone/dark/desktop, real user journeys, offline mode
 ```
 See [docs/QA_REPORT.md](docs/QA_REPORT.md) for exactly what was and wasn't verified.
 
 ## Deployment
-GitHub Pages, deployed by Actions on every push to `main` (the tests must pass first). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+GitHub Pages, deployed by Actions on every push to `main`. Every push and pull request runs the unit tests and the browser tests (in parallel, one job per screen size); only a push to `main` that passes all of them is deployed. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Docs
 [Architecture](docs/ARCHITECTURE.md) · [Data](docs/DATABASE.md) · [Expense logic](docs/EXPENSE_LOGIC.md) · [Privacy & security](docs/SECURITY.md) · [Data API](docs/API.md) · [Deployment](docs/DEPLOYMENT.md) · [QA report](docs/QA_REPORT.md)
