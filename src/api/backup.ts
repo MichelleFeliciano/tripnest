@@ -111,6 +111,7 @@ export function parseBackup(text: string): BackupFile {
       throw new ApiError('A trip in that backup is invalid: its status, currency or budget setting is not recognised.');
     }
   }
+  for (const tr of tables.trips) if (tr.key_info != null && (typeof tr.key_info !== 'string' || tr.key_info.length > 2000)) throw new ApiError('A trip in that backup is invalid: its key info is not valid text.');
   const tripIds = new Set(tables.trips.map((t) => t.id));
   for (const t of TABLES) for (const r of tables[t]) if (t !== 'trips' && !tripIds.has(r.trip_id)) throw new ApiError(`That backup has "${t}" entries that belong to no trip.`);
   for (const r of tables.itinerary_items) {

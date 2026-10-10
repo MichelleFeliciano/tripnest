@@ -94,6 +94,7 @@ function checkTrip(t: Row) {
   need(TRIP_STATUSES.includes(t.status), 'Choose a valid trip status');
   need(isCode(t.default_currency), 'Choose a valid currency');
   need(Number.isInteger(t.budget_near_pct) && t.budget_near_pct >= 1 && t.budget_near_pct <= 100, 'Budget warning threshold must be 1 to 100');
+  need(t.key_info == null || (typeof t.key_info === 'string' && t.key_info.length <= 2000), 'Key info is too long (2,000 characters at most)');
   need(t.cover_image_url === null || /^https:\/\//i.test(t.cover_image_url), 'Cover image must be an https:// link');
 }
 

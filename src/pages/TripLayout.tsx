@@ -2,6 +2,8 @@ import { NavLink, Outlet, useParams } from 'react-router-dom';
 import { useTripLoader, TripProvider } from '../hooks/contexts';
 import { Alert, Spinner, StatusBadge } from '../components/ui';
 import { formatDateRange, tripDuration } from '../lib/trip';
+import { countdown } from '../lib/countdown';
+import { browserTimeZone, localDate } from '../lib/time';
 
 const TABS: [string, string][] = [
   ['', 'Overview'], ['itinerary', 'Itinerary'], ['explore', 'Explore'], ['reservations', 'Reservations'], ['details', 'Travel details'], ['packing', 'Packing'], ['todo', 'To-do'],
@@ -25,6 +27,7 @@ export default function TripLayout() {
   const { trip } = ctx.data;
   const { days, nights } = tripDuration(trip.start_date, trip.end_date);
   const base = `/trips/${trip.id}`;
+  const when = countdown(trip.start_date, trip.end_date, localDate(new Date(), browserTimeZone()));
 
   return (
     <TripProvider value={ctx}>
@@ -34,7 +37,7 @@ export default function TripLayout() {
             <h1 style={{ marginBottom: 2 }}>{trip.name}</h1>
             <p className="muted" style={{ margin: 0 }}>{formatDateRange(trip.start_date, trip.end_date)} · {days} {days === 1 ? 'day' : 'days'} · {nights} {nights === 1 ? 'night' : 'nights'}</p>
           </div>
-          <StatusBadge status={trip.status} />
+          <div className="trip-status"><StatusBadge status={trip.status} /> <strong className="countdown">{when.text}</strong></div>
         </div>
         <nav className="tabs" aria-label="Trip sections">
           {TABS.map(([path, label]) => (

@@ -17,6 +17,8 @@ export interface Trip {
   primary_destination: string | null;
   status: TripStatus;
   notes: string | null;
+  /** Short text pinned on the Overview: flight numbers, hotel address, emergency contacts. Not for passport or card numbers. */
+  key_info?: string | null;
   default_currency: string;
   budget_near_pct: number;
   created_at: string;

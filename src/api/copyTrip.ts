@@ -51,6 +51,7 @@ export function makeTemplate(file: BackupFile, o: CopyOptions): BackupFile {
     end_date: addDays(trip.end_date, delta),
     status: 'planning',
     notes: o.notes ? trip.notes : null,
+    key_info: null, // flight numbers and phone numbers belong to the original trip
     created_at: new Date().toISOString(),
   }];
   tables.travelers = file.tables.travelers;

@@ -12,6 +12,7 @@ import { durationText, formatDateRange } from '../../lib/trip';
 import ItemRow from '../../components/ItemRow';
 import DestinationsCard from '../../components/DestinationsCard';
 import WeatherCard from '../../components/WeatherCard';
+import KeyInfoCard from '../../components/KeyInfoCard';
 import { ProgressBar } from '../../components/ui';
 import { settlementLike } from '../../api/adapters';
 
@@ -103,6 +104,8 @@ export default function Overview() {
           })()}
           <Link to={`${base}/todo`}>Open to-do list →</Link>
         </section>
+
+        <KeyInfoCard />
 
         <WeatherCard />
 

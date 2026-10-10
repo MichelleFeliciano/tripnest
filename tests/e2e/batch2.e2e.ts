@@ -56,3 +56,31 @@ test('the install prompt appears when the browser offers it, installs on tap, an
   await page.waitForTimeout(300);
   await expect(page.getByText('Install TripNest.')).toHaveCount(0); // stays dismissed
 });
+
+test('the trip banner counts down, and Key info can be pinned, edited and cleared', async ({ page }) => {
+  const DAY = 86_400_000;
+  const iso = (n: number) => new Date(Date.now() + n * DAY).toISOString().slice(0, 10);
+  await page.goto('/trips/new');
+  await page.getByLabel('Trip name *').fill('Soon Trip');
+  await page.getByLabel('Start date *').fill(iso(5));
+  await page.getByLabel('End date *').fill(iso(7));
+  await page.getByLabel('Your name *').fill('Michelle');
+  await page.getByRole('button', { name: 'Create trip' }).click();
+  await expect(page.getByRole('heading', { name: 'Soon Trip' })).toBeVisible();
+  await expect(page.locator('.countdown')).toHaveText('Starts in 5 days');
+
+  const card = page.getByRole('region', { name: 'Key info' });
+  await expect(card).toContainText('Pin what you would want');
+  await card.getByRole('button', { name: 'Add' }).click();
+  await page.getByLabel('What should be easy to find?').fill('Hotel: 100 Calle del Cristo\nMom +1 512 555 0123');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(card).toContainText('Hotel: 100 Calle del Cristo');
+  await expect(card).toContainText('Mom +1 512 555 0123');
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Key info' })).toContainText('Mom +1 512 555 0123'); // kept on the device
+
+  await page.getByRole('region', { name: 'Key info' }).getByRole('button', { name: 'Edit' }).click();
+  await page.getByLabel('What should be easy to find?').fill('');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Key info' })).toContainText('Pin what you would want');
+});
