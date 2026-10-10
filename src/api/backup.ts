@@ -5,7 +5,7 @@
  *  - restoreAll(): replace everything on this device with a backup
  *  - importTrip(): add the trips in a file as NEW copies (fresh ids), never overwriting anything
  */
-import { transaction, TABLES, type Row, type StoreName, type Table } from './db';
+import { transaction, TABLES, type Row, type StoreName, type Table, type Tx } from './db';
 import { friendly, ApiError } from './api';
 import { getSettings, saveSettings, type Settings } from './settings';
 import { TRIP_STATUSES, isValidIsoDate, validateTrip } from '../lib/trip';
@@ -25,6 +25,8 @@ export interface BackupFile {
   settings?: Settings;
   tables: Record<Table, Row[]>;
   files: Record<string, { type: string; data: string }>; // document id -> base64
+  /** Single-trip files only: what was deleted from the trip recently, so a merge on another device can delete it there too. */
+  tombstones?: { table: Table; id: string; deleted_at: string }[];
 }
 
 // ───────── base64 ─────────
@@ -34,7 +36,7 @@ async function blobToBase64(b: Blob): Promise<string> {
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(bin);
 }
-function base64ToBlob(data: string, type: string): Blob {
+export function base64ToBlob(data: string, type: string): Blob {
   const bin = atob(data);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -48,7 +50,7 @@ export async function exportData(opts: { tripId?: string; includeFiles: boolean 
   try {
     // Read everything in ONE transaction, but do no slow work inside it: a browser closes a transaction as soon
     // as the code awaits anything that is not a database request (such as converting a file to base64).
-    const { tables, blobs } = await transaction(ALL, 'readonly', async (x) => {
+    const { tables, blobs, tombstones } = await transaction(ALL, 'readonly', async (x) => {
       const tables = Object.fromEntries(TABLES.map((t) => [t, [] as Row[]])) as Record<Table, Row[]>;
       if (opts.tripId) {
         const trip = await x.get('trips', opts.tripId);
@@ -65,11 +67,15 @@ export async function exportData(opts: { tripId?: string; includeFiles: boolean 
           if (blob) blobs.push({ id: d.id, type: d.mime_type, blob });
         }
       }
-      return { tables, blobs };
+      // Recent deletions from this trip travel with the file so another copy of the trip can apply them when it merges.
+      const tombstones = opts.tripId
+        ? (await x.trashAll()).filter((e) => e.trip_id === opts.tripId).flatMap((e) => e.rows.filter((r) => r.table !== 'trips').map((r) => ({ table: r.table, id: r.row.id, deleted_at: e.deleted_at })))
+        : undefined;
+      return { tables, blobs, tombstones };
     });
     const files: BackupFile['files'] = {};
     for (const b of blobs) files[b.id] = { type: b.type, data: await blobToBase64(b.blob) };
-    return { app: 'tripnest', format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), settings: opts.tripId ? undefined : getSettings(), tables, files };
+    return { app: 'tripnest', format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), settings: opts.tripId ? undefined : getSettings(), tables, files, ...(tombstones ? { tombstones } : {}) };
   } catch (e) { throw friendly(e); }
 }
 
@@ -181,7 +187,14 @@ export function parseBackup(text: string): BackupFile {
   }
   const settings = isObj(j.settings) && typeof j.settings.display_name === 'string' && typeof j.settings.home_timezone === 'string'
     ? { display_name: j.settings.display_name, home_timezone: j.settings.home_timezone } : undefined;
-  return { app: 'tripnest', format: BACKUP_FORMAT, exportedAt: String(j.exportedAt ?? ''), settings, tables, files };
+  let tombstones: BackupFile['tombstones'];
+  if (j.tombstones !== undefined) {
+    const list = j.tombstones;
+    const ok = Array.isArray(list) && list.length <= 100_000 && list.every((t) => isObj(t) && (TABLES as readonly string[]).includes(String(t.table)) && isId(t.id) && typeof t.deleted_at === 'string' && Number.isFinite(Date.parse(t.deleted_at)));
+    if (!ok) throw new ApiError('That file has a damaged list of deleted items.');
+    tombstones = list as NonNullable<BackupFile['tombstones']>;
+  }
+  return { app: 'tripnest', format: BACKUP_FORMAT, exportedAt: String(j.exportedAt ?? ''), settings, tables, files, ...(tombstones ? { tombstones } : {}) };
 }
 
 // ───────── restore (replace everything) ─────────
@@ -191,7 +204,7 @@ export async function restoreAll(file: BackupFile): Promise<void> {
       for (const t of TABLES) await x.clear(t);
       await x.clear('blobs');
       await x.clear('trash'); // a restore replaces everything, including what was recently deleted
-      for (const t of TABLES) for (const r of file.tables[t]) await x.put(t, r);
+      for (const t of TABLES) for (const r of file.tables[t]) await x.putAsIs(t, r);
       for (const [id, f] of Object.entries(file.files)) await x.blobPut(id, base64ToBlob(f.data, f.type));
     });
     if (file.settings && isValidTimeZone(file.settings.home_timezone)) saveSettings(file.settings);
@@ -209,39 +222,50 @@ const FK: Partial<Record<Table, Record<string, Table>>> = {
   documents: { itinerary_item_id: 'itinerary_items', reservation_id: 'reservations' },
 };
 
+/**
+ * Writes one trip (and everything in it) from a file into storage.
+ *  keepIds true:  the trip keeps the identity it has in the file, so a later file from the same trip can be matched up and merged.
+ *  keepIds false: an independent copy, every id fresh.
+ */
+export async function writeTrip(x: Tx, file: BackupFile, trip: Row, keepIds: boolean, existingNames: Set<string>): Promise<string> {
+  const map: Partial<Record<Table, Map<string, string>>> = {};
+  const newId = (t: Table, old: string) => {
+    const m = (map[t] ??= new Map());
+    if (!m.has(old)) m.set(old, keepIds ? old : uuid());
+    return m.get(old)!;
+  };
+  const lookup = (t: Table, old: unknown) => (typeof old === 'string' && map[t]?.has(old) ? map[t]!.get(old)! : null);
+  const mine = (t: Table) => file.tables[t].filter((r) => r.trip_id === trip.id);
+  for (const t of TABLES) if (t !== 'trips') for (const r of mine(t)) newId(t, r.id);
+  const tripId = keepIds ? trip.id : uuid();
+  const name = !keepIds && existingNames.has(String(trip.name).toLowerCase()) ? `${trip.name} (copy)`.slice(0, 120) : trip.name;
+  existingNames.add(String(name).toLowerCase());
+  // Which traveler is "me" belongs to the device. If exactly one traveler has this device owner's name, that is them.
+  const myName = getSettings().display_name.trim().toLowerCase();
+  const sameName = myName ? mine('travelers').filter((r) => String(r.name).trim().toLowerCase() === myName) : [];
+  await x.putAsIs('trips', { ...trip, id: tripId, name });
+  for (const t of TABLES) {
+    if (t === 'trips') continue;
+    for (const r of mine(t)) {
+      const row: Row = { ...r, id: map[t]!.get(r.id)!, trip_id: tripId };
+      for (const [field, target] of Object.entries(FK[t] ?? {})) if (field in row) row[field] = lookup(target, row[field]);
+      if (t === 'expenses') row.expense_splits = r.expense_splits.map((s: { user_id: string }) => ({ ...s, user_id: lookup('travelers', s.user_id) ?? s.user_id }));
+      if (t === 'notes' && row.target_id) row.target_id = lookup(row.scope === 'destination' ? 'destinations' : row.scope === 'itinerary' ? 'itinerary_items' : 'reservations', row.target_id);
+      if (t === 'travelers' && sameName.length === 1) row.is_me = r.id === sameName[0].id;
+      await x.putAsIs(t, row);
+      if (t === 'documents' && file.files[r.id]) await x.blobPut(row.id, base64ToBlob(file.files[r.id].data, file.files[r.id].type));
+    }
+  }
+  return tripId;
+}
+
 /** Adds every trip in the file as a new copy with fresh ids. Returns the new trip ids. */
 export async function importTrips(file: BackupFile): Promise<string[]> {
   try {
     return await transaction(ALL, 'readwrite', async (x) => {
       const existingNames = new Set((await x.all('trips')).map((t) => String(t.name).toLowerCase()));
       const created: string[] = [];
-      for (const trip of file.tables.trips) {
-        const map: Partial<Record<Table, Map<string, string>>> = {};
-        const newId = (t: Table, old: string) => {
-          const m = (map[t] ??= new Map());
-          if (!m.has(old)) m.set(old, uuid());
-          return m.get(old)!;
-        };
-        const lookup = (t: Table, old: unknown) => (typeof old === 'string' && map[t]?.has(old) ? map[t]!.get(old)! : null);
-        const mine = (t: Table) => file.tables[t].filter((r) => r.trip_id === trip.id);
-        for (const t of TABLES) if (t !== 'trips') for (const r of mine(t)) newId(t, r.id);
-        const tripId = uuid();
-        const name = existingNames.has(String(trip.name).toLowerCase()) ? `${trip.name} (copy)`.slice(0, 120) : trip.name;
-        existingNames.add(String(name).toLowerCase());
-        await x.put('trips', { ...trip, id: tripId, name });
-        for (const t of TABLES) {
-          if (t === 'trips') continue;
-          for (const r of mine(t)) {
-            const row: Row = { ...r, id: map[t]!.get(r.id)!, trip_id: tripId };
-            for (const [field, target] of Object.entries(FK[t] ?? {})) if (field in row) row[field] = lookup(target, row[field]);
-            if (t === 'expenses') row.expense_splits = r.expense_splits.map((s: { user_id: string }) => ({ ...s, user_id: lookup('travelers', s.user_id) ?? s.user_id }));
-            if (t === 'notes' && row.target_id) row.target_id = lookup(row.scope === 'destination' ? 'destinations' : row.scope === 'itinerary' ? 'itinerary_items' : 'reservations', row.target_id);
-            await x.put(t, row);
-            if (t === 'documents' && file.files[r.id]) await x.blobPut(row.id, base64ToBlob(file.files[r.id].data, file.files[r.id].type));
-          }
-        }
-        created.push(tripId);
-      }
+      for (const trip of file.tables.trips) created.push(await writeTrip(x, file, trip, false, existingNames));
       return created;
     });
   } catch (e) { throw friendly(e); }

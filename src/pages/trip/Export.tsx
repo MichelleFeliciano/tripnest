@@ -61,7 +61,7 @@ export default function Export() {
         <p className="muted">The calendar file works with Apple, Google and Outlook calendars. Times are exact moments, so they show correctly in whichever zone your calendar uses.</p>
         <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '16px 0' }} />
         <h3>Send this trip to another device</h3>
-        <p className="muted">Save the whole trip as a file, then open <strong>Import a trip file</strong> on the Trips page of the other phone. It arrives as an independent copy; nothing is shared afterwards.</p>
+        <p className="muted">Save the whole trip as a file, then open <strong>Import a trip file</strong> on the Trips page of the other phone. The first time, it arrives as that person's own copy. After that, either of you can send an updated file: when it is imported, TripNest offers to update the existing copy with the changes (newer edits win), so you can keep one trip in step by passing files back and forth.</p>
         <ErrorBanner message={file.error} />
         <label className="check"><input type="checkbox" checked={withFiles} onChange={(e) => setWithFiles(e.target.checked)} /> Include uploaded documents ({data.documents.length})</label>
         <ProtectOption o={protect} />

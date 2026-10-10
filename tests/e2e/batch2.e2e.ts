@@ -142,3 +142,77 @@ test('a password-protected backup hides the trip, refuses a wrong password, and 
   await expect(box2).toBeHidden();
   await expect(page.getByRole('link', { name: 'Hush Hush Trip' })).toHaveCount(1);
 });
+
+test('two phones keep one trip in step by passing files: first import, an update with a preview, and a separate copy', async ({ browser, baseURL }, info) => {
+  test.setTimeout(150_000);
+  const phone = async () => { const ctx = await browser.newContext({ baseURL, viewport: { width: 375, height: 812 } }); return { ctx, page: await ctx.newPage() }; };
+  const a = await phone();
+  const b = await phone();
+  try {
+    // Michelle's phone: a trip with an expense
+    await a.page.goto('/trips/new');
+    await a.page.getByLabel('Trip name *').fill('Shared Trip');
+    await a.page.getByLabel('Start date *').fill('2027-06-12');
+    await a.page.getByLabel('End date *').fill('2027-06-14');
+    await a.page.getByLabel('Your name *').fill('Michelle');
+    await a.page.getByLabel('Who else is going?').fill('Mom');
+    await a.page.getByRole('button', { name: 'Create trip' }).click();
+    await expect(a.page.getByRole('heading', { name: 'Shared Trip' })).toBeVisible();
+    const tripUrl = a.page.url().replace(/\/$/, '');
+    const save = async (p: typeof a, name: string) => {
+      await p.page.goto(`${tripUrl}/export`);
+      const [dl] = await Promise.all([p.page.waitForEvent('download'), p.page.getByRole('button', { name: 'Save trip to a file' }).click()]);
+      const file = info.outputPath(name);
+      await dl.saveAs(file);
+      return file;
+    };
+    const fromA = await save(a, 'from-a.json');
+
+    // Mom's phone imports it: new to her, so no questions asked
+    await b.page.goto('/trips');
+    await b.page.locator('input[type=file]').first().setInputFiles(fromA);
+    await expect(b.page.getByText(/Added 1 trip from the file/)).toBeVisible();
+    await expect(b.page.getByRole('link', { name: 'Shared Trip' })).toBeVisible();
+
+    // Mom adds an itinerary item and sends the trip back
+    await b.page.getByRole('link', { name: 'Shared Trip' }).click();
+    await expect(b.page).toHaveURL(new RegExp(`${tripUrl.split('/').pop()}$`));
+    await b.page.goto(`${tripUrl}/itinerary?new=1`);
+    await b.page.getByLabel('Title *').fill("Mom's museum visit");
+    await b.page.getByLabel('Date *', { exact: true }).fill('2027-06-13');
+    await b.page.getByRole('button', { name: 'Add to itinerary' }).click();
+    await expect(b.page.locator('main')).toContainText("Mom's museum visit");
+    const fromB = await save(b, 'from-b.json');
+
+    // Michelle imports it: she is offered an update, with a preview
+    await a.page.goto('/trips');
+    await a.page.locator('input[type=file]').first().setInputFiles(fromB);
+    const dialog = a.page.getByRole('dialog', { name: 'You already have this trip' });
+    await expect(dialog).toContainText('Shared Trip');
+    await expect(dialog).toContainText('1 new');
+    await dialog.getByRole('button', { name: 'Update my copy' }).click();
+    await expect(a.page.getByText(/Updated “Shared Trip” \(1 added\)/)).toBeVisible();
+    await expect(a.page.getByRole('link', { name: 'Shared Trip' })).toHaveCount(1); // still one trip, not two
+    await a.page.goto(`${tripUrl}/itinerary`);
+    await expect(a.page.locator('main')).toContainText("Mom's museum visit");
+
+    // importing the same file again says there is nothing new
+    await a.page.goto('/trips');
+    await a.page.locator('input[type=file]').first().setInputFiles(fromB);
+    const again = a.page.getByRole('dialog', { name: 'You already have this trip' });
+    await expect(again).toContainText('already up to date');
+    // ...and the person can still choose to keep both
+    await again.getByLabel('Add it as a separate copy').check();
+    await again.getByRole('button', { name: 'Add a copy' }).click();
+    await expect(a.page.getByText(/Added 1 trip from the file/)).toBeVisible();
+    await expect(a.page.getByRole('link', { name: /Shared Trip/ })).toHaveCount(2);
+
+    // the dialog can be cancelled without changing anything
+    await a.page.locator('input[type=file]').first().setInputFiles(fromB);
+    await a.page.getByRole('dialog', { name: 'You already have this trip' }).getByRole('button', { name: 'Cancel' }).click();
+    await expect(a.page.getByRole('link', { name: /Shared Trip/ })).toHaveCount(2);
+  } finally {
+    await a.ctx.close();
+    await b.ctx.close();
+  }
+});

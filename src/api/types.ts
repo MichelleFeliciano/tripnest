@@ -9,6 +9,8 @@ import type { TripStatus } from '../lib/trip';
  */
 export interface Trip {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   name: string;
   description: string | null;
   start_date: string;
@@ -25,6 +27,8 @@ export interface Trip {
 }
 export interface Traveler {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   name: string;
   /** The traveler this device's owner is (drives "you owe…" wording and the personal packing list). */
@@ -33,6 +37,8 @@ export interface Traveler {
 }
 export interface Destination {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   name: string;
   country: string | null;
@@ -73,6 +79,8 @@ export interface ItineraryRow {
 export type ReservationKind = 'flight' | 'hotel' | 'restaurant' | 'activity' | 'car_rental' | 'other';
 export interface Reservation {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   itinerary_item_id: string | null;
   kind: ReservationKind;
@@ -91,6 +99,8 @@ export interface Reservation {
 }
 export interface PackingCategory {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   name: string;
   is_shared: boolean;
@@ -99,6 +109,8 @@ export interface PackingCategory {
 }
 export interface PackingItem {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   category_id: string;
   name: string;
@@ -112,6 +124,8 @@ export interface PackingItem {
 }
 export interface Expense {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   paid_by: string;
   description: string;
@@ -127,6 +141,8 @@ export interface Expense {
 }
 export interface Settlement {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   from_user: string;
   to_user: string;
@@ -138,6 +154,8 @@ export interface Settlement {
 }
 export interface BudgetRowDb {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   category: BudgetCategory | null;
   amount_cents: number;
@@ -146,6 +164,8 @@ export interface BudgetRowDb {
 export type NoteScope = 'trip' | 'destination' | 'itinerary' | 'reservation';
 export interface Note {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   scope: NoteScope;
   target_id: string | null;
@@ -154,6 +174,8 @@ export interface Note {
 }
 export interface DocumentRow {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   itinerary_item_id: string | null;
   reservation_id: string | null;
@@ -166,6 +188,8 @@ export interface DocumentRow {
 /** A pre-trip to-do item (book flights, check passport...). */
 export interface Task {
   id: string;
+  /** When this row was last saved on this device or arrived in a merge. Decides which copy wins when trips are merged. */
+  updated_at?: string;
   trip_id: string;
   title: string;
   due_date: string | null;

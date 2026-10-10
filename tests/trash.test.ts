@@ -15,6 +15,8 @@ async function setup() {
   const d = await loadTrip(t.id);
   return { t, d, me: d.travelers[0].id, jon: d.travelers[1].id };
 }
+/** A restored row is stamped as a new change (so it also wins over a deletion that was already shared), so compare without the stamp. */
+const noStamp = (v: unknown) => JSON.parse(JSON.stringify(v, (k, x) => (k === 'updated_at' ? undefined : x)));
 const file = (n: string) => new File([new Uint8Array([1, 2, 3, 4, 5])], n, { type: 'application/pdf' });
 
 describe('upgrading from version 1', () => {
@@ -60,7 +62,8 @@ describe('recently deleted: restore puts everything back', () => {
     expect((await loadTrip(t.id)).expenses).toHaveLength(0);
     expect(await trash.list()).toHaveLength(1);
     await trash.restore(del!.id);
-    expect((await loadTrip(t.id)).expenses[0]).toEqual(before);
+    expect(noStamp((await loadTrip(t.id)).expenses[0])).toEqual(noStamp(before));
+    expect(Date.parse((await loadTrip(t.id)).expenses[0].updated_at!)).toBeGreaterThanOrEqual(Date.parse(before.updated_at!));
     expect(await trash.list()).toHaveLength(0);
   });
 
@@ -72,7 +75,7 @@ describe('recently deleted: restore puts everything back', () => {
     const del = await expenses.removeSettlement(sid);
     expect(del?.summary).toContain('Payment');
     await trash.restore(del!.id);
-    expect((await loadTrip(t.id)).settlements[0]).toEqual(before);
+    expect(noStamp((await loadTrip(t.id)).settlements[0])).toEqual(noStamp(before));
   });
 
   it('an itinerary item brings back the links from reservations, expenses and documents', async () => {
@@ -148,7 +151,7 @@ describe('recently deleted: restore puts everything back', () => {
     await expect(documents.openUrl(doc.id)).rejects.toThrow(/missing/);
 
     await trash.restore(del.id);
-    expect(await loadTrip(t.id)).toEqual(before);
+    expect(noStamp(await loadTrip(t.id))).toEqual(noStamp(before));
     expect(await documents.openUrl(doc.id)).toMatch(/^blob:/);
   });
 });

@@ -81,7 +81,10 @@ export interface Tx {
   all(t: Table): Promise<Row[]>;
   byTrip(t: Table, tripId: string): Promise<Row[]>;
   get(t: Table, id: string): Promise<Row | undefined>;
+  /** Saves a row and stamps it `updated_at: now` (this is what lets two copies of a trip be merged later). */
   put(t: Table, row: Row): Promise<void>;
+  /** Saves a row exactly as given, keeping its own `updated_at` (restoring a backup, importing, merging). */
+  putAsIs(t: Table, row: Row): Promise<void>;
   del(t: Table, id: string): Promise<void>;
   clear(t: Table | 'blobs' | 'trash'): Promise<void>;
   blobPut(id: string, blob: Blob): Promise<void>;
@@ -109,7 +112,8 @@ export async function transaction<T>(stores: StoreName[], mode: IDBTransactionMo
       all: (s) => req(t.objectStore(s).getAll()) as Promise<Row[]>,
       byTrip: (s, id) => req(t.objectStore(s).index('trip_id').getAll(id)) as Promise<Row[]>,
       get: (s, id) => req(t.objectStore(s).get(id)) as Promise<Row | undefined>,
-      put: async (s, row) => { await req(t.objectStore(s).put(row)); },
+      put: async (s, row) => { await req(t.objectStore(s).put({ ...row, updated_at: new Date().toISOString() })); },
+      putAsIs: async (s, row) => { await req(t.objectStore(s).put(row)); },
       del: async (s, id) => { await req(t.objectStore(s).delete(id)); },
       clear: async (s) => { await req(t.objectStore(s).clear()); },
       blobPut: async (id, blob) => { await req(t.objectStore('blobs').put({ id, blob })); },
