@@ -171,7 +171,7 @@ test('keyboard focus is never hidden behind the sticky bars', async ({ page }, i
 test('very long unbroken words never push the page sideways', async ({ page }, info) => {
   test.setTimeout(150_000);
   const long = 'Supercalifragilistic'.repeat(5) + 'https://example.com/' + 'a'.repeat(80);
-  const file = sampleTripFile();
+  const file = structuredClone(sampleTripFile()); // a copy: the sample data is shared by every test in this worker
   const t = file.tables;
   t.trips[0].name = long.slice(0, 110);
   t.trips[0].description = long;
