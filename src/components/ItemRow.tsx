@@ -13,7 +13,9 @@ export function timeLabel(i: ItineraryRow): { main: string; tz: string | null } 
   return { main, tz: zoneAbbr(i.start_at, i.start_tz) };
 }
 
-export default function ItemRow({ item, conflict, onEdit, canEdit }: { item: ItineraryRow; conflict?: string; onEdit?: (i: ItineraryRow) => void; canEdit?: boolean }) {
+export interface MoveControls { canUp: boolean; canDown: boolean; onMove: (i: ItineraryRow, dir: -1 | 1) => void }
+
+export default function ItemRow({ item, conflict, onEdit, canEdit, move }: { item: ItineraryRow; conflict?: string; onEdit?: (i: ItineraryRow) => void; canEdit?: boolean; move?: MoveControls }) {
   const t = timeLabel(item);
   return (
     <li className={`item ${conflict ? 'conflict' : ''}`}>
@@ -24,7 +26,15 @@ export default function ItemRow({ item, conflict, onEdit, canEdit }: { item: Iti
       <div>
         <div className="row-between">
           <strong><span aria-hidden="true">{ITEM_ICONS[item.item_type]} </span>{item.title} <span className="sr-only">({ITEM_LABELS[item.item_type]})</span></strong>
-          {canEdit && onEdit && <button className="btn btn-sm" onClick={() => onEdit(item)} aria-label={`Edit ${item.title}`}>Edit</button>}
+          <span className="row">
+            {move && (move.canUp || move.canDown) && (
+              <>
+                <button className="btn btn-sm btn-ghost" onClick={() => move.onMove(item, -1)} disabled={!move.canUp} aria-label={`Move ${item.title} earlier`}>▲</button>
+                <button className="btn btn-sm btn-ghost" onClick={() => move.onMove(item, 1)} disabled={!move.canDown} aria-label={`Move ${item.title} later`}>▼</button>
+              </>
+            )}
+            {canEdit && onEdit && <button className="btn btn-sm" onClick={() => onEdit(item)} aria-label={`Edit ${item.title}`}>Edit</button>}
+          </span>
         </div>
         <div className="muted">
           {ITEM_LABELS[item.item_type]}

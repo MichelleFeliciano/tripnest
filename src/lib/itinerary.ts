@@ -101,3 +101,30 @@ export function findConflicts(items: ItemLike[]): Conflict[] {
   }
   return out;
 }
+
+/**
+ * Manual ordering only decides between items that sort as equals: the untimed ("all day") items of a day, or
+ * items that start at exactly the same moment. Anything with a different start time is ordered by the clock.
+ * Returns that group, in display order.
+ */
+export function orderGroup<T extends ItemLike>(items: T[], id: string): T[] {
+  const me = items.find((i) => i.id === id);
+  if (!me) return [];
+  return sortItems(items).filter((i) => i.localDate === me.localDate && (i.startAt ? Date.parse(i.startAt) : null) === (me.startAt ? Date.parse(me.startAt) : null));
+}
+
+/** Can this item move up (-1) or down (+1) within its group? */
+export function canMove<T extends ItemLike>(items: T[], id: string, dir: -1 | 1): boolean {
+  const g = orderGroup(items, id);
+  const at = g.findIndex((i) => i.id === id);
+  return at >= 0 && at + dir >= 0 && at + dir < g.length;
+}
+
+/** New sort_order values (0..n-1 for the whole group) after moving one step; empty when it cannot move. */
+export function moveWithinGroup<T extends ItemLike>(items: T[], id: string, dir: -1 | 1): { id: string; sort_order: number }[] {
+  if (!canMove(items, id, dir)) return [];
+  const g = orderGroup(items, id);
+  const at = g.findIndex((i) => i.id === id);
+  [g[at], g[at + dir]] = [g[at + dir], g[at]];
+  return g.map((i, n) => ({ id: i.id, sort_order: n }));
+}

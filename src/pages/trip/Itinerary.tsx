@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { itinerary } from '../../api/api';
+import { useToast } from '../../components/Toast';
 import { useTrip } from '../../hooks/contexts';
 import { itemLike } from '../../api/adapters';
 import type { ItineraryRow } from '../../api/types';
-import { findConflicts, groupByDay } from '../../lib/itinerary';
+import { canMove, findConflicts, groupByDay, moveWithinGroup } from '../../lib/itinerary';
 import { addDays, dayIndex, isValidIsoDate, tripDates } from '../../lib/trip';
 import { formatDateLong, formatDateShort } from '../../lib/time';
 import { Alert, Dialog, Empty } from '../../components/ui';
@@ -16,7 +18,8 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export default function Itinerary() {
-  const { data } = useTrip();
+  const { data, reload } = useTrip();
+  const toast = useToast();
   const [sp, setSp] = useSearchParams();
   const { trip } = data;
   const dates = useMemo(() => tripDates(trip.start_date, trip.end_date), [trip]);
@@ -31,6 +34,13 @@ export default function Itinerary() {
   const conflictFor = (id: string) => conflicts.find((c) => c.a === id || c.b === id)?.reason;
   const rowOf = (id: string) => data.items.find((i) => i.id === id)!;
 
+  const move = async (i: ItineraryRow, dir: -1 | 1) => {
+    const updates = moveWithinGroup(likes, i.id, dir);
+    if (!updates.length) return;
+    try { await itinerary.reorder(updates); await reload(); } catch (e) { toast.say((e as Error).message); }
+  };
+  const moveFor = (id: string) => ({ canUp: canMove(likes, id, -1), canDown: canMove(likes, id, 1), onMove: move });
+
   const setView = (v: View, d?: string) => setSp((p) => { const n = new URLSearchParams(p); n.set('view', v); if (d) n.set('date', d); n.delete('new'); return n; }, { replace: true });
   const openNew = () => setForm({ open: true, editing: null });
   const edit = (i: ItineraryRow) => setForm({ open: true, editing: i });
@@ -42,7 +52,7 @@ export default function Itinerary() {
       <section aria-labelledby={`day-${d}`}>
         <h2 id={`day-${d}`} className="day-head">Day {dayIndex(trip.start_date, d)} · {formatDateLong(d)}</h2>
         {items.length === 0 ? <p className="muted">Nothing planned yet.{<> <button className="btn btn-sm" onClick={() => { setSp((p) => { const n = new URLSearchParams(p); n.set('date', d); return n; }, { replace: true }); openNew(); }}>Add something</button></>}</p> : (
-          <ul className="list">{items.map((i) => <ItemRow key={i.id} item={rowOf(i.id)} conflict={conflictFor(i.id)} canEdit onEdit={edit} />)}</ul>
+          <ul className="list">{items.map((i) => <ItemRow key={i.id} item={rowOf(i.id)} conflict={conflictFor(i.id)} canEdit onEdit={edit} move={moveFor(i.id)} />)}</ul>
         )}
       </section>
     );

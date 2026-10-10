@@ -321,3 +321,29 @@ test('to-do list: add from an idea, tick it off, search finds it, and the trip c
   await expect(page.getByRole('checkbox', { name: /Book flights/ })).not.toBeChecked(); // everything starts undone
   await expect(page.getByRole('checkbox', { name: /Renew passport/ })).toBeVisible();
 });
+
+test('all-day items can be moved up and down, and the order is still there after a reload', async ({ page }) => {
+  await createTrip(page);
+  const base = page.url().replace(/\/$/, '');
+  for (const title of ['Zebra walk', 'Apple picking', 'Museum']) {
+    await page.goto(base + '/itinerary?new=1');
+    await page.getByLabel('Title *').fill(title);
+    await page.getByLabel('Date *', { exact: true }).fill('2027-06-13');
+    await page.getByRole('button', { name: 'Add to itinerary' }).click();
+    await expect(page.locator('main')).toContainText(title);
+  }
+  const titles = () => page.locator('li.item strong').allInnerTexts();
+  const clean = async () => (await titles()).map((t) => t.replace(/^\W+/, '').replace(/\s*\(.*$/, '').trim());
+  await expect.poll(clean).toEqual(['Apple picking', 'Museum', 'Zebra walk']); // alphabetical until arranged by hand
+
+  await page.getByRole('button', { name: 'Move Zebra walk earlier' }).click();
+  await expect.poll(clean).toEqual(['Apple picking', 'Zebra walk', 'Museum']);
+  await page.getByRole('button', { name: 'Move Zebra walk earlier' }).click();
+  await expect.poll(clean).toEqual(['Zebra walk', 'Apple picking', 'Museum']);
+  await expect(page.getByRole('button', { name: 'Move Zebra walk earlier' })).toBeDisabled();
+
+  await page.reload();
+  await expect.poll(clean).toEqual(['Zebra walk', 'Apple picking', 'Museum']);
+  await page.getByRole('button', { name: 'Move Zebra walk later' }).click();
+  await expect.poll(clean).toEqual(['Apple picking', 'Zebra walk', 'Museum']);
+});
