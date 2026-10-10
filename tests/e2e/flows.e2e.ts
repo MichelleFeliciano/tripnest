@@ -4,6 +4,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { seedSampleTrip } from './fixtures';
 
 async function createTrip(page: Page, name = 'Lake Weekend') {
   await page.goto('/trips/new');
@@ -32,6 +33,51 @@ test('create a trip, add to the itinerary, and it is still there after a reload'
 
   await page.reload();
   await expect(page.locator('main')).toContainText('Boat rental');
+});
+
+test('deleting an expense offers Undo, and the expense comes back unchanged', async ({ page }) => {
+  await createTrip(page);
+  await page.getByRole('link', { name: '+ Expense' }).first().click();
+  await page.getByLabel('Description *').fill('Cabin');
+  await page.getByLabel('Amount *').fill('90.01');
+  await page.getByRole('button', { name: 'Save expense' }).click();
+  await expect(page.locator('main')).toContainText('$90.01');
+
+  page.once('dialog', (d) => void d.accept());
+  await page.getByRole('button', { name: 'Delete Cabin' }).click();
+  await expect(page.locator('main')).not.toContainText('$90.01');
+  await expect(page.getByRole('status').filter({ hasText: 'Deleted Expense' })).toContainText('Cabin ($90.01)');
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('main')).toContainText('$90.01');
+  await expect(page.getByRole('status').filter({ hasText: 'Restored' })).toBeVisible();
+});
+
+test('a deleted trip and a deleted document can be restored from Profile, files included', async ({ page, context }) => {
+  const tripId = await seedSampleTrip(page); // has a stored PDF
+  // delete the document, then undo
+  await page.goto(`/trips/${tripId}/documents`);
+  page.once('dialog', (d) => void d.accept());
+  await page.getByRole('button', { name: 'Delete hotel-confirmation.pdf' }).click();
+  await expect(page.locator('main')).not.toContainText('hotel-confirmation.pdf');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('main')).toContainText('hotel-confirmation.pdf');
+  const [popup] = await Promise.all([context.waitForEvent('page'), page.getByRole('button', { name: 'Open hotel-confirmation.pdf' }).click()]);
+  await expect.poll(() => popup.url(), { timeout: 10_000 }).toMatch(/^blob:/); // the file itself came back
+
+  // delete the whole trip, then restore it from Profile
+  await page.goto(`/trips/${tripId}/settings`);
+  page.once('dialog', (d) => void d.accept('Puerto Rico Vacation'));
+  await page.getByRole('button', { name: 'Delete trip…' }).click();
+  await expect(page.locator('main')).toContainText('No trips yet');
+  await page.goto('/profile');
+  await expect(page.locator('#rd-h').locator('..')).toContainText('Trip: Puerto Rico Vacation');
+  await page.getByRole('button', { name: 'Restore Trip Puerto Rico Vacation' }).click();
+  await expect(page.getByRole('button', { name: 'Restore Trip Puerto Rico Vacation' })).toHaveCount(0);
+  await page.goto('/trips');
+  await page.getByRole('link', { name: 'Puerto Rico Vacation' }).click();
+  await page.getByRole('link', { name: 'Expenses' }).last().click();
+  await expect(page.locator('main')).toContainText('$320.01'); // expenses came back with the trip
 });
 
 test('moving an itinerary item to another day keeps its times and does not trip over a stale end date', async ({ page }) => {

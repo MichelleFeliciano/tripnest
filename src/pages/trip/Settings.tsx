@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { useToast } from '../../components/Toast';
+import type { Deleted } from '../../api/api';
 import { useNavigate } from 'react-router-dom';
 import { trips } from '../../api/api';
 import { useTrip } from '../../hooks/contexts';
@@ -9,6 +11,7 @@ import { Alert, ErrorBanner, Field } from '../../components/ui';
 
 export default function Settings() {
   const { data, reload } = useTrip();
+  const toast = useToast();
   const nav = useNavigate();
   const t = data.trip;
   const [f, setF] = useState({
@@ -39,8 +42,10 @@ export default function Settings() {
     if (ok) await reload();
   };
   const del = async () => {
-    if (window.prompt(`This permanently deletes the trip and everything in it, including documents, from this device.\nTip: download a backup first (Profile page) if you might want it back.\nType the trip name to confirm:`) !== t.name) return;
-    const ok = await run(async () => { await trips.remove(t.id); return true; });
+    if (window.prompt(`This deletes the trip and everything in it, including documents.\nYou can restore it for 30 days from Profile → Recently deleted.\nType the trip name to confirm:`) !== t.name) return;
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await trips.remove(t.id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) nav('/trips', { replace: true });
   };
 

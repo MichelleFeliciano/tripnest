@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react';
+import { useToast } from './Toast';
+import type { Deleted } from '../api/api';
 import { rows } from '../api/api';
 import { geocode, parseCoord } from '../api/geocode';
 import type { Destination } from '../api/types';
@@ -9,6 +11,7 @@ import { Dialog, ErrorBanner, Field } from './ui';
 
 export default function DestinationsCard() {
   const { data, reload } = useTrip();
+  const toast = useToast();
   const [editing, setEditing] = useState<Destination | 'new' | null>(null);
   const [f, setF] = useState({ name: '', country: '', region: '', lat: '', lng: '', arrival: '', departure: '', notes: '' });
   const [err, setErr] = useState<string | null>(null);
@@ -52,7 +55,9 @@ export default function DestinationsCard() {
 
   const remove = async (d: Destination) => {
     if (!window.confirm(`Remove ${d.name}? Itinerary items stay, but lose this destination tag.`)) return;
-    const ok = await run(async () => { await rows.remove('destinations', d.id); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await rows.remove('destinations', d.id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) { await reload(); setEditing(null); }
   };
 

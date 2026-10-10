@@ -1,4 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { useToast } from '../../components/Toast';
+import type { Deleted } from '../../api/api';
 import { useSearchParams } from 'react-router-dom';
 import { expenses as api } from '../../api/api';
 import { expenseLike, nameOf, settlementLike } from '../../api/adapters';
@@ -24,6 +26,7 @@ interface Form {
 
 export default function Expenses() {
   const { data, me, reload } = useTrip();
+  const toast = useToast();
   const [sp, setSp] = useSearchParams();
   const memberIds = data.travelers.map((t) => t.id);
   const blank = (): Form => ({
@@ -97,13 +100,17 @@ export default function Expenses() {
 
   const remove = async (e: Expense) => {
     if (!window.confirm(`Delete "${e.description}"? Balances will update. Recorded settlements are kept.`)) return;
-    const ok = await run(async () => { await api.remove(e.id); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await api.remove(e.id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) await reload();
   };
 
   const removePayment = async (id: string) => {
     if (!window.confirm('Delete this recorded payment? The balance goes back up.')) return;
-    const ok = await run(async () => { await api.removeSettlement(id); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await api.removeSettlement(id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) await reload();
   };
 

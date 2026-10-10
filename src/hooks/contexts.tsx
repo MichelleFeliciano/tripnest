@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { friendly, loadTrip } from '../api/api';
 import type { TripData } from '../api/types';
+import { DATA_CHANGED } from '../components/Toast';
 
 interface TripCtx {
   data: TripData;
@@ -33,6 +34,12 @@ export function useTripLoader(tripId: string | undefined) {
     }
   }, [tripId]);
   useEffect(() => { setLoading(true); setData(null); void reload(); }, [reload]);
+  // an Undo (or another tab's restore) changes stored data: reload what is on screen
+  useEffect(() => {
+    const again = () => { void reload(); };
+    window.addEventListener(DATA_CHANGED, again);
+    return () => window.removeEventListener(DATA_CHANGED, again);
+  }, [reload]);
 
   const ctx = useMemo<TripCtx | null>(() => (data ? { data, me: data.me, reload } : null), [data, reload]);
   return { ctx, error, loading, reload };

@@ -5,9 +5,27 @@
  */
 export const TABLES = [
   'trips', 'travelers', 'destinations', 'itinerary_items', 'reservations', 'packing_categories',
-  'packing_items', 'expenses', 'settlements', 'budgets', 'notes', 'documents',
+  'packing_items', 'expenses', 'settlements', 'budgets', 'notes', 'documents', 'tasks',
 ] as const;
 export type Table = (typeof TABLES)[number];
+
+/** A deleted item (or whole trip) kept for 30 days so it can be restored. Not part of backups. */
+export interface TrashEntry {
+  id: string;
+  /** e.g. "Expense", "Trip" */
+  kind: string;
+  label: string;
+  trip_id: string;
+  trip_name: string;
+  deleted_at: string;
+  /** every row that was removed, including children (a trip carries its whole contents) */
+  rows: { table: Table; row: Row }[];
+  /** uploaded files that belonged to removed documents */
+  blobs: { id: string; blob: Blob }[];
+  /** references that were cleared on other rows by the delete, so a restore can put them back */
+  unlinks: { table: Table; id: string; field: string; value: string }[];
+}
+export type StoreName = Table | 'blobs' | 'trash';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Row = Record<string, any> & { id: string };
 
@@ -18,7 +36,7 @@ export class StorageUnavailableError extends Error {
 }
 
 const DB_NAME = 'tripnest';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // v2 adds the "tasks" and "trash" stores
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 /** Forget the open connection (tests, and after a full wipe). */
@@ -33,13 +51,17 @@ function open(): Promise<IDBDatabase> {
     if (typeof indexedDB === 'undefined') return reject(new StorageUnavailableError());
     let req: IDBOpenDBRequest;
     try { req = indexedDB.open(DB_NAME, DB_VERSION); } catch { return reject(new StorageUnavailableError()); }
+    // Runs for a brand-new database (creates everything) and for an upgrade from an older version
+    // (creates only what is missing; existing stores and their data are never touched).
     req.onupgradeneeded = () => {
       const db = req.result;
       for (const t of TABLES) {
+        if (db.objectStoreNames.contains(t)) continue;
         const store = db.createObjectStore(t, { keyPath: 'id' });
         if (t !== 'trips') store.createIndex('trip_id', 'trip_id');
       }
-      db.createObjectStore('blobs', { keyPath: 'id' }); // uploaded documents
+      if (!db.objectStoreNames.contains('blobs')) db.createObjectStore('blobs', { keyPath: 'id' }); // uploaded documents
+      if (!db.objectStoreNames.contains('trash')) db.createObjectStore('trash', { keyPath: 'id' }); // recently deleted
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -61,15 +83,19 @@ export interface Tx {
   get(t: Table, id: string): Promise<Row | undefined>;
   put(t: Table, row: Row): Promise<void>;
   del(t: Table, id: string): Promise<void>;
-  clear(t: Table | 'blobs'): Promise<void>;
+  clear(t: Table | 'blobs' | 'trash'): Promise<void>;
   blobPut(id: string, blob: Blob): Promise<void>;
   blobGet(id: string): Promise<Blob | undefined>;
   blobDel(id: string): Promise<void>;
   blobIds(): Promise<string[]>;
+  trashAll(): Promise<TrashEntry[]>;
+  trashGet(id: string): Promise<TrashEntry | undefined>;
+  trashPut(entry: TrashEntry): Promise<void>;
+  trashDel(id: string): Promise<void>;
 }
 
 /** Run `fn` inside a single transaction over `stores`. Throwing inside `fn` rolls everything back. */
-export async function transaction<T>(stores: (Table | 'blobs')[], mode: IDBTransactionMode, fn: (x: Tx) => Promise<T>): Promise<T> {
+export async function transaction<T>(stores: StoreName[], mode: IDBTransactionMode, fn: (x: Tx) => Promise<T>): Promise<T> {
   const db = await open();
   return new Promise<T>((resolve, reject) => {
     let t: IDBTransaction;
@@ -90,6 +116,10 @@ export async function transaction<T>(stores: (Table | 'blobs')[], mode: IDBTrans
       blobGet: async (id) => ((await req(t.objectStore('blobs').get(id))) as { blob: Blob } | undefined)?.blob,
       blobDel: async (id) => { await req(t.objectStore('blobs').delete(id)); },
       blobIds: async () => (await req(t.objectStore('blobs').getAllKeys())) as string[],
+      trashAll: () => req(t.objectStore('trash').getAll()) as Promise<TrashEntry[]>,
+      trashGet: (id) => req(t.objectStore('trash').get(id)) as Promise<TrashEntry | undefined>,
+      trashPut: async (entry) => { await req(t.objectStore('trash').put(entry)); },
+      trashDel: async (id) => { await req(t.objectStore('trash').delete(id)); },
     };
     fn(x).then((r) => { result = r; }).catch((e) => {
       failed = true;

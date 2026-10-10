@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
-import { trips } from './api/api';
+import { trash, trips } from './api/api';
 import { requestPersistence } from './api/db';
 import { Alert, Spinner } from './components/ui';
 import TripsPage from './pages/TripsPage';
@@ -76,6 +76,7 @@ export default function App() {
   useEffect(() => {
     void requestPersistence(); // ask the browser not to evict our data (best effort)
     trips.list().catch((e: Error) => setStorageProblem(e.message));
+    void trash.purgeOld(); // drop anything deleted more than 30 days ago
   }, []);
 
   return (

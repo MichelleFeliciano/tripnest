@@ -1,4 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
+import { useToast } from '../../components/Toast';
+import type { Deleted } from '../../api/api';
 import { ALLOWED_DOC_TYPES, MAX_DOC_BYTES, documents } from '../../api/api';
 import type { DocumentRow } from '../../api/types';
 import { useTrip } from '../../hooks/contexts';
@@ -9,6 +11,7 @@ const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 102
 
 export default function Documents() {
   const { data, reload } = useTrip();
+  const toast = useToast();
   const [link, setLink] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [picked, setPicked] = useState<File | null>(null);
@@ -40,7 +43,9 @@ export default function Documents() {
   };
   const del = async (d: DocumentRow) => {
     if (!window.confirm(`Delete ${d.file_name}?`)) return;
-    const ok = await run(async () => { await documents.remove(d); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await documents.remove(d); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) await reload();
   };
 

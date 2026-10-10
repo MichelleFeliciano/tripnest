@@ -5,6 +5,7 @@ import { importTrips, parseBackup } from '../api/backup';
 import type { Trip } from '../api/types';
 import { Alert, Empty, ErrorBanner, Spinner, StatusBadge } from '../components/ui';
 import { useAction } from '../hooks/hooks';
+import { DATA_CHANGED } from '../components/Toast';
 import { formatDateRange, tripDuration } from '../lib/trip';
 
 export default function TripsPage() {
@@ -16,7 +17,11 @@ export default function TripsPage() {
   const imp = useAction();
 
   const refresh = () => tripsApi.list().then(setList).catch((e) => setError(friendly(e).message));
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+    window.addEventListener(DATA_CHANGED, refresh);
+    return () => window.removeEventListener(DATA_CHANGED, refresh);
+  }, []);
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;

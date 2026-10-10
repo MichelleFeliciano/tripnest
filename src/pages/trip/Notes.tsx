@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react';
+import { useToast } from '../../components/Toast';
+import type { Deleted } from '../../api/api';
 import { rows } from '../../api/api';
 import type { Note, NoteScope } from '../../api/types';
 import { useTrip } from '../../hooks/contexts';
@@ -9,6 +11,7 @@ const SCOPES: [NoteScope, string][] = [['trip', 'Trip'], ['destination', 'Destin
 
 export default function Notes() {
   const { data, reload } = useTrip();
+  const toast = useToast();
   const [scope, setScope] = useState<NoteScope>('trip');
   const [target, setTarget] = useState('');
   const [body, setBody] = useState('');
@@ -29,12 +32,16 @@ export default function Notes() {
   const add = async (e: FormEvent) => {
     e.preventDefault();
     if (!body.trim() || (scope !== 'trip' && !target)) return;
-    const ok = await run(async () => { await rows.insert('notes', { trip_id: data.trip.id, scope, target_id: scope === 'trip' ? null : target, body }); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await rows.insert('notes', { trip_id: data.trip.id, scope, target_id: scope === 'trip' ? null : target, body }); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) { setBody(''); await reload(); }
   };
   const del = async (n: Note) => {
     if (!window.confirm('Delete this note?')) return;
-    const ok = await run(async () => { await rows.remove('notes', n.id); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await rows.remove('notes', n.id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) await reload();
   };
 

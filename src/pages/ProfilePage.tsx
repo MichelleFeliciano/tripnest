@@ -3,6 +3,7 @@ import { backupFileName, eraseEverything, exportData, parseBackup, restoreAll } 
 import { storageEstimate } from '../api/db';
 import { getSettings, saveSettings } from '../api/settings';
 import { Alert, Dialog, ErrorBanner, Field, download } from '../components/ui';
+import RecentlyDeleted from '../components/RecentlyDeleted';
 import { useAction } from '../hooks/hooks';
 import { browserTimeZone, COMMON_TIMEZONES, isValidTimeZone } from '../lib/time';
 
@@ -92,6 +93,8 @@ export default function ProfilePage() {
         <p className="muted">To add a single trip from a file without replacing anything, use <strong>Import a trip file</strong> on the Trips page.</p>
         {usage && <p className="muted">Using {mb(usage.usedBytes)} of this device's allowance{usage.persistent ? '. Your browser has promised to keep it.' : '. Your browser may clear it if the device runs low on space, so back up now and then.'}</p>}
       </section>
+
+      <RecentlyDeleted />
 
       <section className="card" aria-labelledby="er-h" style={{ borderColor: 'var(--danger)' }}>
         <h2 id="er-h">Erase everything</h2>

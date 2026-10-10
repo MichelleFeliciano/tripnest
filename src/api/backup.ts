@@ -5,7 +5,7 @@
  *  - restoreAll(): replace everything on this device with a backup
  *  - importTrip(): add the trips in a file as NEW copies (fresh ids), never overwriting anything
  */
-import { transaction, TABLES, type Row, type Table } from './db';
+import { transaction, TABLES, type Row, type StoreName, type Table } from './db';
 import { friendly, ApiError } from './api';
 import { getSettings, saveSettings, type Settings } from './settings';
 import { TRIP_STATUSES, isValidIsoDate, validateTrip } from '../lib/trip';
@@ -40,7 +40,7 @@ function base64ToBlob(data: string, type: string): Blob {
   return new Blob([bytes], { type });
 }
 
-const ALL: (Table | 'blobs')[] = [...TABLES, 'blobs'];
+const ALL: StoreName[] = [...TABLES, 'blobs', 'trash'];
 
 /** Everything (tripId omitted) or a single trip. */
 export async function exportData(opts: { tripId?: string; includeFiles: boolean }): Promise<BackupFile> {
@@ -136,6 +136,9 @@ export function parseBackup(text: string): BackupFile {
   for (const r of tables.budgets) {
     if ((r.category !== null && !BUDGET_CATEGORIES.includes(r.category)) || !isMoney(r.amount_cents) || !isCode(r.currency)) throw new ApiError('A budget in that backup is invalid.');
   }
+  for (const r of tables.tasks) {
+    if (typeof r.title !== 'string' || typeof r.done !== 'boolean' || !(r.due_date === null || r.due_date === undefined || isValidIsoDate(String(r.due_date)))) throw new ApiError('A to-do in that backup is invalid.');
+  }
   for (const r of tables.notes) if (!['trip', 'destination', 'itinerary', 'reservation'].includes(r.scope) || typeof r.body !== 'string') throw new ApiError('A note in that backup is invalid.');
   for (const r of tables.expenses) {
     const splits = r.expense_splits;
@@ -163,6 +166,7 @@ export async function restoreAll(file: BackupFile): Promise<void> {
     await transaction(ALL, 'readwrite', async (x) => {
       for (const t of TABLES) await x.clear(t);
       await x.clear('blobs');
+      await x.clear('trash'); // a restore replaces everything, including what was recently deleted
       for (const t of TABLES) for (const r of file.tables[t]) await x.put(t, r);
       for (const [id, f] of Object.entries(file.files)) await x.blobPut(id, base64ToBlob(f.data, f.type));
     });
@@ -222,7 +226,7 @@ export async function importTrips(file: BackupFile): Promise<string[]> {
 /** Remove everything stored on this device (trips, documents, preferences). */
 export async function eraseEverything(): Promise<void> {
   try {
-    await transaction(ALL, 'readwrite', async (x) => { for (const t of TABLES) await x.clear(t); await x.clear('blobs'); });
+    await transaction(ALL, 'readwrite', async (x) => { for (const t of TABLES) await x.clear(t); await x.clear('blobs'); await x.clear('trash'); });
     try { localStorage.removeItem('tripnest:settings'); } catch { /* ignore */ }
   } catch (e) { throw friendly(e); }
 }

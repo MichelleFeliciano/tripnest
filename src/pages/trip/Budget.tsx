@@ -31,7 +31,7 @@ export default function Budget() {
     return b ? minorToInput(b.amount_cents, b.currency) : '';
   };
   const [vals, setVals] = useState<Record<string, string>>({});
-  const { busy, error, run } = useAction();
+  const { busy, error, run } = useAction();
 
   const rowsForSummary: BudgetRow[] = data.budgets.map((b) => ({ category: b.category, amountCents: b.amount_cents, currency: b.currency }));
   const summary = summarizeBudget(rowsForSummary, data.expenses.map((e) => ({ category: e.category, amountCents: e.amount_cents, currency: e.currency })), data.trip.budget_near_pct);
@@ -52,7 +52,7 @@ export default function Budget() {
       }); // validate everything first so a typo never leaves a half-saved budget
       for (const { cat, cents } of parsed) {
         const existing = data.budgets.find((b) => b.category === cat);
-        if (cents === null) { if (existing) await rows.remove('budgets', existing.id); continue; }
+        if (cents === null) { if (existing) await rows.remove('budgets', existing.id, { silent: true }); continue; }
         if (existing) await rows.update('budgets', existing.id, { amount_cents: cents, currency });
         else await rows.insert('budgets', { trip_id: data.trip.id, category: cat, amount_cents: cents, currency });
       }

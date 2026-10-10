@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react';
+import { useToast } from './Toast';
+import type { Deleted } from '../api/api';
 import { rows } from '../api/api';
 import { defaultZone } from '../api/adapters';
 import { geocode, parseCoord } from '../api/geocode';
@@ -19,6 +21,7 @@ interface Form {
 
 export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { editing: ItineraryRow | null; defaultDate?: string; onDone: () => void; onCancel: () => void }) {
   const { data, reload } = useTrip();
+  const toast = useToast();
   const { trip } = data;
   const lastTz = defaultZone(data.items);
   const endLocalDate = editing?.end_at && editing.end_tz ? localDate(editing.end_at, editing.end_tz) : '';
@@ -104,7 +107,9 @@ export default function ItemForm({ editing, defaultDate, onDone, onCancel }: { e
 
   const remove = async () => {
     if (!editing || !window.confirm(`Delete "${editing.title}"? This can't be undone.`)) return;
-    const ok = await run(async () => { await rows.remove('itinerary_items', editing.id); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await rows.remove('itinerary_items', editing.id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) { clear(); await reload(); onDone(); }
   };
   return (

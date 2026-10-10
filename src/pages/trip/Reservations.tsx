@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react';
+import { useToast } from '../../components/Toast';
+import type { Deleted } from '../../api/api';
 import { useSearchParams } from 'react-router-dom';
 import { rows } from '../../api/api';
 import { defaultZone } from '../../api/adapters';
@@ -64,6 +66,7 @@ export function ReservationCard({ r, onEdit }: { r: Reservation; onEdit?: (r: Re
 
 export default function Reservations() {
   const { data, reload } = useTrip();
+  const toast = useToast();
   const [sp, setSp] = useSearchParams();
   const tz0 = defaultZone(data.items);
   const blank = (): F => ({ kind: 'hotel', title: '', provider: '', confirmation_number: '', s_date: '', s_time: '', s_tz: tz0, e_date: '', e_time: '', e_tz: tz0, website: '', phone: '', address: '', notes: '', itinerary_item_id: '', details: {} });
@@ -112,7 +115,9 @@ export default function Reservations() {
   };
   const remove = async () => {
     if (!editing || editing === 'new' || !window.confirm(`Delete "${editing.title}"?`)) return;
-    const ok = await run(async () => { await rows.remove('reservations', editing.id); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await rows.remove('reservations', editing.id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) { await reload(); close(); }
   };
 

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 import { routerBasename } from './lib/appUrl';
 import './styles.css';
 
@@ -22,9 +23,11 @@ window.addEventListener('load', () => setTimeout(() => { try { sessionStorage.re
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <BrowserRouter basename={routerBasename()}>
-        <App />
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter basename={routerBasename()}>
+          <App />
+        </BrowserRouter>
+      </ToastProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

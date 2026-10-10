@@ -167,6 +167,15 @@ td.num { white-space: nowrap; }
 }
 caption { text-align: left; font-weight: 700; padding: 0 0 8px; }
 
+/* ── undo / message bar ── */
+.toast-region { position: fixed; left: 12px; right: 12px; bottom: 16px; z-index: 60; display: flex; justify-content: center; pointer-events: none; }
+@media (max-width: 719px) { .toast-region { bottom: calc(var(--tab-h) + 12px + env(safe-area-inset-bottom)); } }
+.toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; max-width: 560px; width: 100%; background: var(--text); color: var(--bg); border-radius: 16px; padding: .6rem .8rem .6rem 1rem; box-shadow: 0 10px 30px rgba(7, 34, 46, .35); }
+.toast > span { flex: 1; }
+.toast-error { background: var(--danger); color: var(--bg); }
+.toast-btn { background: transparent; color: inherit; border-color: currentColor; }
+.toast-btn:hover { background: rgba(255, 255, 255, .15); border-color: currentColor; box-shadow: none; }
+
 /* ── itinerary ── */
 .day-head { position: sticky; top: var(--nav-h); background: var(--bg); padding: 8px 0; z-index: 5; border-bottom: 3px dotted var(--sun); margin: 16px 0 4px; }
 .day-head::before { content: '☀️' / ''; margin-right: .45rem; }

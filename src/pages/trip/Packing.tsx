@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react';
+import { useToast } from '../../components/Toast';
+import type { Deleted } from '../../api/api';
 import { useSearchParams } from 'react-router-dom';
 import { packing, rows } from '../../api/api';
 import { nameOf } from '../../api/adapters';
@@ -10,6 +12,7 @@ import { Dialog, Empty, ErrorBanner, Field, ProgressBar } from '../../components
 
 export default function Packing() {
   const { data, me, reload } = useTrip();
+  const toast = useToast();
   const [sp, setSp] = useSearchParams();
   const [shared, setShared] = useState(true);
   const [who, setWho] = useState(me); // whose personal list is shown
@@ -56,12 +59,16 @@ export default function Packing() {
     if (ok) { await reload(); setTplOpen(false); }
   };
   const removeItem = async (i: PackingItem) => {
-    const ok = await run(async () => { await rows.remove('packing_items', i.id); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await rows.remove('packing_items', i.id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) await reload();
   };
   const removeCat = async (id: string, name: string) => {
     if (!window.confirm(`Delete the "${name}" category and all items in it?`)) return;
-    const ok = await run(async () => { await rows.remove('packing_categories', id); return true; });
+    let gone: Deleted | undefined;
+    const ok = await run(async () => { gone = await rows.remove('packing_categories', id); return true; });
+    if (ok) toast.deleted(gone);
     if (ok) await reload();
   };
   const closeAdd = () => { setAdding(false); setSp((p) => { const n = new URLSearchParams(p); n.delete('new'); return n; }, { replace: true }); };

@@ -3,16 +3,16 @@
  * The rules the old database used to enforce (valid money, balanced splits, cascades, same-trip references)
  * are enforced here, inside single transactions, and are covered by tests/store.test.ts.
  */
-import { transaction, TABLES, StorageUnavailableError, type Row, type Table, type Tx } from './db';
+import { transaction, TABLES, StorageUnavailableError, type Row, type StoreName, type Table, type TrashEntry, type Tx } from './db';
 import type {
   BudgetRowDb, Destination, DocumentRow, Expense, ItineraryRow, Note, PackingCategory, PackingItem, Reservation, Settlement,
-  Traveler, Trip, TripData,
+  Task, Traveler, Trip, TripData,
 } from './types';
 import type { SplitMethod } from '../lib/splits';
 import { expandTemplate, type PackingTemplate } from '../lib/packing';
 import { BUDGET_CATEGORIES, EXPENSE_CATEGORIES } from '../lib/budget';
 import { ITEM_TYPES } from '../lib/itinerary';
-import { MAX_MINOR_UNITS } from '../lib/money';
+import { MAX_MINOR_UNITS, formatMoney } from '../lib/money';
 import { TRIP_STATUSES, isValidIsoDate, validateTrip } from '../lib/trip';
 import { uuid } from '../lib/uuid';
 
@@ -55,6 +55,22 @@ function coords(r: Row) {
 }
 
 const ALL: Table[] = [...TABLES];
+/** Everything a delete may touch: all tables, uploaded files, and the recently-deleted store. */
+const ALLX: StoreName[] = [...TABLES, 'blobs', 'trash'];
+
+/** What a delete returns, so the screen can offer "Undo". */
+export interface Deleted { id: string; summary: string }
+export const TRASH_DAYS = 30;
+
+async function stash(
+  x: Tx, tripId: string, kind: string, label: string, rows: { table: Table; row: Row }[],
+  blobs: { id: string; blob: Blob }[] = [], unlinks: TrashEntry['unlinks'] = [],
+): Promise<Deleted> {
+  const trip = await x.get('trips', tripId);
+  const entry: TrashEntry = { id: uuid(), kind, label, trip_id: tripId, trip_name: String(trip?.name ?? label), deleted_at: nowIso(), rows, blobs, unlinks };
+  await x.trashPut(entry);
+  return { id: entry.id, summary: `${kind} “${label}”` };
+}
 
 // ───────── settings-free helpers used by several areas ─────────
 async function requireTrip(x: Tx, tripId: unknown): Promise<Row> {
@@ -116,16 +132,25 @@ export const trips = {
       });
     } catch (e) { throw friendly(e); }
   },
-  /** Deletes the trip and everything in it, including uploaded documents. */
-  remove: async (id: string) => {
+  /** Deletes the trip and everything in it (including documents). It stays in "Recently deleted" for ${TRASH_DAYS} days. */
+  remove: async (id: string): Promise<Deleted> => {
     try {
-      await transaction([...ALL, 'blobs'], 'readwrite', async (x) => {
-        for (const d of await x.byTrip('documents', id)) await x.blobDel(d.id);
+      return await transaction(ALLX, 'readwrite', async (x) => {
+        const trip = await requireTrip(x, id);
+        const removed: { table: Table; row: Row }[] = [{ table: 'trips', row: trip }];
+        const blobs: { id: string; blob: Blob }[] = [];
+        for (const d of await x.byTrip('documents', id)) {
+          const blob = await x.blobGet(d.id);
+          if (blob) blobs.push({ id: d.id, blob });
+          await x.blobDel(d.id);
+        }
         for (const t of ALL) {
           if (t === 'trips') continue;
-          for (const r of await x.byTrip(t, id)) await x.del(t, r.id);
+          for (const r of await x.byTrip(t, id)) { removed.push({ table: t, row: r }); await x.del(t, r.id); }
         }
+        const deleted = await stash(x, id, 'Trip', String(trip.name), removed, blobs);
         await x.del('trips', id);
+        return deleted;
       });
     } catch (e) { throw friendly(e); }
   },
@@ -152,6 +177,7 @@ export async function loadTrip(id: string): Promise<TripData> {
         budgets: await by<BudgetRowDb>('budgets'),
         notes: (await by<Note>('notes')).sort((a, b) => str(b.created_at).localeCompare(str(a.created_at))),
         documents: (await by<DocumentRow>('documents')).sort((a, b) => str(b.created_at).localeCompare(str(a.created_at))),
+        tasks: (await by<Task>('tasks')).sort((a, b) => Number(!!a.done) - Number(!!b.done) || (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || str(a.created_at).localeCompare(str(b.created_at))),
       };
     });
   } catch (e) { throw friendly(e); }
@@ -219,7 +245,7 @@ export const travelers = {
 };
 
 // ───────── generic trip-scoped rows ─────────
-type RowTable = 'destinations' | 'itinerary_items' | 'reservations' | 'budgets' | 'notes' | 'packing_categories' | 'packing_items';
+type RowTable = 'destinations' | 'itinerary_items' | 'reservations' | 'budgets' | 'notes' | 'packing_categories' | 'packing_items' | 'tasks';
 const DEFAULTS: Record<RowTable, Record<string, unknown>> = {
   destinations: { country: null, region: null, latitude: null, longitude: null, notes: null, arrival_date: null, departure_date: null, sort_order: 0 },
   itinerary_items: {
@@ -234,6 +260,7 @@ const DEFAULTS: Record<RowTable, Record<string, unknown>> = {
   notes: { target_id: null },
   packing_categories: { is_shared: true, owner_id: null, sort_order: 0 },
   packing_items: { quantity: 1, packed: false, assigned_to: null, notes: null, is_shared: true, owner_id: null },
+  tasks: { due_date: null, done: false, notes: null },
 };
 
 async function validateRow(x: Tx, table: RowTable, r: Row): Promise<void> {
@@ -289,6 +316,12 @@ async function validateRow(x: Tx, table: RowTable, r: Row): Promise<void> {
       need(r.is_shared ? r.owner_id === null : typeof r.owner_id === 'string', 'Invalid list');
       if (r.owner_id) need((await travelerIds(x, tid)).has(r.owner_id), 'That traveler is not on this trip');
       break;
+    case 'tasks':
+      need(textLen(r.title, 1, 200), 'Write what needs doing');
+      need(r.due_date === null || isValidIsoDate(r.due_date), 'The due date is not valid');
+      need(typeof r.done === 'boolean', 'Invalid to-do');
+      need(r.notes === null || textLen(r.notes, 0, 2000), 'Notes are too long');
+      break;
     case 'packing_items': {
       need(textLen(r.name, 1, 200), 'Item name is required');
       need(Number.isInteger(r.quantity) && r.quantity >= 1 && r.quantity <= 999, 'Quantity must be 1 to 999');
@@ -325,14 +358,17 @@ export const rows = {
       });
     } catch (e) { throw friendly(e); }
   },
-  remove: async (table: RowTable, id: string) => {
+  /** Deletes a row (and what depends on it). Unless `silent`, it is kept in "Recently deleted" and can be restored. */
+  remove: async (table: RowTable, id: string, opts: { silent?: boolean } = {}): Promise<Deleted | undefined> => {
     try {
-      await transaction([...ALL, 'blobs'], 'readwrite', async (x) => {
+      return await transaction(ALLX, 'readwrite', async (x) => {
         const cur = await x.get(table, id);
-        if (!cur) return;
+        if (!cur) return undefined;
         const tid = cur.trip_id as string;
+        const removed: { table: Table; row: Row }[] = [{ table, row: cur }];
+        const unlinks: TrashEntry['unlinks'] = [];
         const unlink = async (t: Table, field: string) => {
-          for (const r of await x.byTrip(t, tid)) if (r[field] === id) await x.put(t, { ...r, [field]: null });
+          for (const r of await x.byTrip(t, tid)) if (r[field] === id) { unlinks.push({ table: t, id: r.id, field, value: id }); await x.put(t, { ...r, [field]: null }); }
         };
         if (table === 'destinations') await unlink('itinerary_items', 'destination_id');
         if (table === 'itinerary_items') {
@@ -341,8 +377,46 @@ export const rows = {
           await unlink('documents', 'itinerary_item_id');
         }
         if (table === 'reservations') await unlink('documents', 'reservation_id');
-        if (table === 'packing_categories') for (const p of await x.byTrip('packing_items', tid)) if (p.category_id === id) await x.del('packing_items', p.id);
+        if (table === 'packing_categories') {
+          for (const p of await x.byTrip('packing_items', tid)) if (p.category_id === id) { removed.push({ table: 'packing_items', row: p }); await x.del('packing_items', p.id); }
+        }
         await x.del(table, id);
+        if (opts.silent) return undefined;
+        return stash(x, tid, KIND[table], labelOf(table, cur), removed, [], unlinks);
+      });
+    } catch (e) { throw friendly(e); }
+  },
+};
+
+const KIND: Record<RowTable, string> = {
+  destinations: 'Destination', itinerary_items: 'Itinerary item', reservations: 'Reservation', budgets: 'Budget', notes: 'Note',
+  packing_categories: 'Packing category', packing_items: 'Packing item', tasks: 'To-do',
+};
+function labelOf(table: RowTable, row: Row): string {
+  const text = String(table === 'notes' ? row.body : table === 'budgets' ? (row.category ?? 'Total') : (row.title ?? row.name ?? 'item')).replace(/\s+/g, ' ').trim();
+  return text.length > 40 ? text.slice(0, 39) + '…' : text;
+}
+
+// ───────── pre-trip to-do list ─────────
+export const tasks = {
+  add: (tripId: string, title: string, dueDate: string) => rows.insert<Task>('tasks', { trip_id: tripId, title, due_date: dueDate || null }),
+  toggle: (id: string, done: boolean) => rows.update('tasks', id, { done }),
+  update: (id: string, patch: { title?: string; due_date?: string | null; notes?: string | null }) => rows.update('tasks', id, patch),
+  remove: (id: string) => rows.remove('tasks', id),
+};
+
+// ───────── itinerary order ─────────
+export const itinerary = {
+  /** Apply a new manual order (see `moveWithinGroup` in lib/itinerary) in one step. */
+  reorder: async (updates: { id: string; sort_order: number }[]) => {
+    try {
+      await transaction(['itinerary_items'], 'readwrite', async (x) => {
+        for (const u of updates) {
+          const cur = await x.get('itinerary_items', u.id);
+          need(cur, 'That item no longer exists.');
+          need(Number.isInteger(u.sort_order) && u.sort_order >= 0 && u.sort_order < 100000, 'Invalid position');
+          await x.put('itinerary_items', { ...cur, sort_order: u.sort_order });
+        }
       });
     } catch (e) { throw friendly(e); }
   },
@@ -421,8 +495,15 @@ export const expenses = {
       });
     } catch (err) { throw friendly(err); }
   },
-  remove: async (id: string) => {
-    try { await transaction(['expenses'], 'readwrite', (x) => x.del('expenses', id)); } catch (e) { throw friendly(e); }
+  remove: async (id: string): Promise<Deleted | undefined> => {
+    try {
+      return await transaction(ALLX, 'readwrite', async (x) => {
+        const cur = await x.get('expenses', id);
+        if (!cur) return undefined;
+        await x.del('expenses', id);
+        return stash(x, cur.trip_id, 'Expense', `${cur.description} (${formatMoney(cur.amount_cents, cur.currency)})`, [{ table: 'expenses', row: cur }]);
+      });
+    } catch (e) { throw friendly(e); }
   },
   /** Record that a debt was paid. This is a ledger entry only; no money moves. */
   settle: async (tripId: string, from: string, to: string, amountCents: number, currency: string, date: string, note: string) => {
@@ -441,8 +522,15 @@ export const expenses = {
       });
     } catch (e) { throw friendly(e); }
   },
-  removeSettlement: async (id: string) => {
-    try { await transaction(['settlements'], 'readwrite', (x) => x.del('settlements', id)); } catch (e) { throw friendly(e); }
+  removeSettlement: async (id: string): Promise<Deleted | undefined> => {
+    try {
+      return await transaction(ALLX, 'readwrite', async (x) => {
+        const cur = await x.get('settlements', id);
+        if (!cur) return undefined;
+        await x.del('settlements', id);
+        return stash(x, cur.trip_id, 'Payment', `${formatMoney(cur.amount_cents, cur.currency)} on ${cur.settled_on}`, [{ table: 'settlements', row: cur }]);
+      });
+    } catch (e) { throw friendly(e); }
   },
 };
 
@@ -475,9 +563,78 @@ export const documents = {
       return URL.createObjectURL(blob);
     } catch (e) { throw friendly(e); }
   },
-  remove: async (doc: DocumentRow) => {
+  remove: async (doc: DocumentRow): Promise<Deleted | undefined> => {
     try {
-      await transaction(['documents', 'blobs'], 'readwrite', async (x) => { await x.blobDel(doc.id); await x.del('documents', doc.id); });
+      return await transaction(ALLX, 'readwrite', async (x) => {
+        const cur = await x.get('documents', doc.id);
+        if (!cur) return undefined;
+        const blob = await x.blobGet(doc.id);
+        await x.blobDel(doc.id);
+        await x.del('documents', doc.id);
+        return stash(x, cur.trip_id, 'Document', cur.file_name, [{ table: 'documents', row: cur }], blob ? [{ id: doc.id, blob }] : []);
+      });
     } catch (e) { throw friendly(e); }
+  },
+};
+
+// ───────── recently deleted ─────────
+/** Fields that point at other rows. A restore clears any that now point at something that no longer exists. */
+const REFS: Partial<Record<Table, Record<string, Table>>> = {
+  itinerary_items: { destination_id: 'destinations' },
+  reservations: { itinerary_item_id: 'itinerary_items' },
+  expenses: { itinerary_item_id: 'itinerary_items' },
+  documents: { itinerary_item_id: 'itinerary_items', reservation_id: 'reservations' },
+  packing_items: { assigned_to: 'travelers' },
+};
+
+export const trash = {
+  list: async (): Promise<TrashEntry[]> => {
+    const all = await transaction(['trash'], 'readonly', (x) => x.trashAll());
+    return all.sort((a, b) => str(b.deleted_at).localeCompare(str(a.deleted_at)));
+  },
+  /** Put a deleted item (or trip) back, including the links other things had to it. */
+  restore: async (id: string): Promise<{ tripId: string; summary: string }> => {
+    try {
+      return await transaction(ALLX, 'readwrite', async (x) => {
+        const e = await x.trashGet(id);
+        need(e, 'That item is no longer in Recently deleted.');
+        if (e.kind !== 'Trip') need(await x.get('trips', e.trip_id), `The trip it belonged to (${e.trip_name}) was deleted. Restore the trip first.`);
+        for (const { table, row } of e.rows) {
+          if (await x.get(table, row.id)) continue; // never overwrite something that exists again
+          if (table === 'packing_items') need(await x.get('packing_categories', row.category_id) || e.rows.some((r) => r.table === 'packing_categories' && r.row.id === row.category_id), 'Restore its packing category first.');
+          const fixed: Row = { ...row };
+          for (const [field, target] of Object.entries(REFS[table] ?? {})) {
+            const ref = fixed[field];
+            if (ref && !(await x.get(target, ref)) && !e.rows.some((r) => r.table === target && r.row.id === ref)) fixed[field] = null;
+          }
+          await x.put(table, fixed);
+        }
+        for (const b of e.blobs) await x.blobPut(b.id, b.blob);
+        for (const u of e.unlinks) {
+          const r = await x.get(u.table, u.id);
+          if (r && r[u.field] === null && await x.get(REFS[u.table]?.[u.field] ?? (u.table === 'itinerary_items' ? 'destinations' : 'itinerary_items'), u.value)) await x.put(u.table, { ...r, [u.field]: u.value });
+        }
+        await x.trashDel(id);
+        return { tripId: e.trip_id, summary: `${e.kind} “${e.label}”` };
+      });
+    } catch (err) { throw friendly(err); }
+  },
+  discard: async (id: string) => {
+    try { await transaction(['trash'], 'readwrite', (x) => x.trashDel(id)); } catch (e) { throw friendly(e); }
+  },
+  empty: async () => {
+    try { await transaction(['trash'], 'readwrite', (x) => x.clear('trash')); } catch (e) { throw friendly(e); }
+  },
+  /** Permanently drop entries older than `days`. Runs when the app starts. */
+  purgeOld: async (days = TRASH_DAYS, now = Date.now()) => {
+    try {
+      return await transaction(['trash'], 'readwrite', async (x) => {
+        let n = 0;
+        for (const e of await x.trashAll()) {
+          if (now - Date.parse(e.deleted_at) > days * 86_400_000) { await x.trashDel(e.id); n++; }
+        }
+        return n;
+      });
+    } catch { return 0; }
   },
 };

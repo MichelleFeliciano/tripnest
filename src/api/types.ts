@@ -161,6 +161,17 @@ export interface DocumentRow {
   created_at: string;
 }
 
+/** A pre-trip to-do item (book flights, check passport...). */
+export interface Task {
+  id: string;
+  trip_id: string;
+  title: string;
+  due_date: string | null;
+  done: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface TripData {
   trip: Trip;
   /** Traveler id of "me" on this device. */
@@ -176,4 +187,5 @@ export interface TripData {
   budgets: BudgetRowDb[];
   notes: Note[];
   documents: DocumentRow[];
+  tasks: Task[];
 }
