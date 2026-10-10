@@ -11,6 +11,7 @@ import { openTaskCounts } from '../../lib/tasks';
 import { durationText, formatDateRange } from '../../lib/trip';
 import ItemRow from '../../components/ItemRow';
 import DestinationsCard from '../../components/DestinationsCard';
+import WeatherCard from '../../components/WeatherCard';
 import { ProgressBar } from '../../components/ui';
 import { settlementLike } from '../../api/adapters';
 
@@ -102,6 +103,8 @@ export default function Overview() {
           })()}
           <Link to={`${base}/todo`}>Open to-do list →</Link>
         </section>
+
+        <WeatherCard />
 
         <DestinationsCard />
       </div>

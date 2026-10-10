@@ -6,7 +6,7 @@ TripNest has **no server, no accounts and no analytics**. Your trips, expenses a
 | Area | What protects it |
 |---|---|
 | Where data lives | Your browser's IndexedDB on your device. It is never uploaded. Different phones and different browser profiles are separate |
-| Network use | Only optional lookups: OpenStreetMap map tiles (Map page), Nominatim geocoding ("Find coordinates"), Overpass places (Explore). They receive coordinates or a place name you typed, never your trip, names, money or documents. Nothing else leaves the page |
+| Network use | Only optional lookups: OpenStreetMap map tiles (Map page), Nominatim geocoding ("Find coordinates"), Overpass places (Explore), and Open-Meteo weather (Overview, off until you turn it on). They receive coordinates (and the dates being asked about) or a place name you typed, never your trip, names, money or documents. Nothing else leaves the page |
 | Output encoding | React escapes all text; no `dangerouslySetInnerHTML`; map popups are built from text nodes |
 | Links | External links must be http(s) and use `rel="noopener noreferrer"`; cover images are https-only and sent with no referrer |
 | Imported files | Backup and trip files are parsed as data (never executed), size-limited, and structurally validated (ids, dates, time zones, money, that splits add up, that every row belongs to a trip). A bad file is refused and changes nothing. Restores are transactional |

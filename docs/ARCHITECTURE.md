@@ -11,7 +11,7 @@ A trip planner that is mobile-first, free to run forever, private by default, an
 | Travelers are **names, not accounts** | Needed for splitting costs and packing, without sign-in or sharing infrastructure |
 | Service worker generated at build time | After one visit the whole app opens with no connection |
 | Pure logic in `src/lib` | Money, splits, balances, budgets, time zones, itinerary, ICS, search are framework-free and unit tested |
-| Leaflet + OpenStreetMap, Nominatim, Overpass | Free, no API keys; optional and non-essential. The app works fully without them |
+| Leaflet + OpenStreetMap, Nominatim, Overpass, Open-Meteo (weather) | Free, no API keys; optional and non-essential. The app works fully without them |
 
 **Trade-off accepted:** each device has its own copy. A trip moves between devices only through an explicit backup/trip file. Real-time sharing would require a server (not built; see the end of this file).
 
