@@ -62,7 +62,7 @@ export default function Explore() {
     const ok = await add.run(async () => {
       await rows.insert('itinerary_items', {
         trip_id: data.trip.id, local_date: day, title: p.name.slice(0, 200), item_type: itemTypeFor(p.category),
-        description: `${p.kind}${p.openingHours ? ` · Hours: ${p.openingHours}` : ''}`.slice(0, 5000), location_name: p.name.slice(0, 200),
+        description: [p.summary ?? p.kind, p.openingHours ? `Hours: ${p.openingHours}` : ''].filter(Boolean).join(' · ').slice(0, 5000), location_name: p.name.slice(0, 200),
         address: p.address?.slice(0, 300), latitude: Number(p.lat.toFixed(6)), longitude: Number(p.lng.toFixed(6)), website: p.website,
         destination_id: dest?.id ?? null,
       });
@@ -136,6 +136,7 @@ export default function Explore() {
                   <div className="row-between">
                     <div>
                       <strong>{p.name}</strong> <span className="badge">{p.kind}</span>
+                      {p.summary && <p className="place-desc">{p.summary}</p>}
                       <div className="muted">{p.distanceKm.toFixed(1)} km away{p.address ? ` · ${p.address}` : ''}</div>
                       {p.openingHours && <div className="muted">Hours: {p.openingHours}</div>}
                       <div className="row" style={{ gap: 12 }}>

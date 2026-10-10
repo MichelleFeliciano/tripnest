@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildOverpassQuery, haversineKm, itemTypeFor, kindLabel, parsePlaces, MAX_RESULTS } from '../src/lib/explore';
+import { describePlace, buildOverpassQuery, haversineKm, itemTypeFor, kindLabel, parsePlaces, MAX_RESULTS } from '../src/lib/explore';
 
 describe('explore: query building', () => {
   it('builds a bounded, named-only query from constants', () => {
@@ -67,5 +67,47 @@ describe('explore: parsing and ranking', () => {
     const plain = { type: 'node', id: 99, lat: 1, lon: 1.5, tags: { name: 'Plain Spot', tourism: 'attraction' } };
     expect(parsePlaces({ elements: [...docs, plain] }, 'sights', 1, 1).some((p) => p.name === 'Plain Spot')).toBe(false);
     expect(parsePlaces({ elements: [docs[0], plain] }, 'sights', 1, 1).some((p) => p.name === 'Plain Spot')).toBe(true);
+  });
+});
+
+describe('explore: short descriptions', () => {
+  const d = (tags: Record<string, string>, kind = 'Place') => describePlace(tags, kind);
+  it('prefers what a mapper wrote, with links and stray whitespace removed', () => {
+    expect(d({ description: '  Spanish fortress   guarding the bay. See https://example.com/x for tickets.  ' })).toBe('Spanish fortress guarding the bay. See for tickets.');
+    expect(d({ 'description:en': 'English text here, please.', description: 'Texto en español aquí.' })).toBe('English text here, please.');
+  });
+  it('ignores a description too short to mean anything', () => {
+    expect(d({ description: 'Nice' })).toBeNull();
+  });
+  it('cuts a long description at a word boundary', () => {
+    const long = 'word '.repeat(80).trim();
+    const out = d({ description: long })!;
+    expect(out.length).toBeLessThanOrEqual(160);
+    expect(out.endsWith('…')).toBe(true);
+    expect(out.slice(0, -1).endsWith('word')).toBe(true);
+  });
+  it('builds a sentence for restaurants from cuisine and amenities', () => {
+    expect(d({ cuisine: 'seafood;puerto_rican', outdoor_seating: 'yes', takeaway: 'yes' }, 'Restaurant')).toBe('Seafood and Puerto Rican restaurant. Has outdoor seating and offers takeaway.');
+    expect(d({ cuisine: 'pizza' }, 'Restaurant')).toBe('Pizza restaurant.');
+    expect(d({ cuisine: 'italian;pizza' }, 'Restaurant')).toBe('Italian and pizza restaurant.');
+  });
+  it('describes sights from practical facts, never inventing any', () => {
+    expect(d({ fee: 'no', wheelchair: 'yes' })).toBe('Free to visit and wheelchair accessible.');
+    expect(d({ fee: 'yes', start_date: '1634', operator: 'National Park Service' })).toBe('Has an entry fee, dates from 1634 and run by National Park Service.');
+    expect(d({ natural: 'peak', ele: '1338' })).toBe('1,338 m (4,390 ft) above sea level.');
+  });
+  it('says nothing when OpenStreetMap has nothing useful, and skips junk values', () => {
+    expect(d({})).toBeNull();
+    expect(d({ cuisine: 'yes', start_date: 'unknown', ele: 'abc', wheelchair: 'no', fee: 'maybe' })).toBeNull();
+    expect(d({ start_date: '2999' })).toBeNull(); // not a date in the past
+    expect(d({ operator: 'A'.repeat(60) })).toBeNull();
+  });
+  it('keeps at most three facts', () => {
+    const s = d({ outdoor_seating: 'yes', takeaway: 'yes', fee: 'no', wheelchair: 'yes' })!;
+    expect(s).toBe('Has outdoor seating, offers takeaway and free to visit.');
+  });
+  it('is attached to parsed places', () => {
+    const [p] = parsePlaces({ elements: [{ type: 'node', id: 9, lat: 1, lon: 1, tags: { name: 'Playa Flamenco', natural: 'beach', fee: 'no', wheelchair: 'limited' } }] }, 'nature', 1, 1);
+    expect(p.summary).toBe('Free to visit and limited wheelchair access.');
   });
 });

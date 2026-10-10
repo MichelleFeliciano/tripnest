@@ -26,6 +26,15 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - **offline (production build + service worker):** after one visit the network is cut; reload, a deep link and saving a new expense all work, and the data survives going back online; the manifest and icons are valid.
 
 ## Bugs found by this testing and fixed
+**Stylesheet review (every rule read; unused classes found by script):**
+- **The map painted over the sticky top bar and the bottom tab bar** when scrolling past it (Leaflet's internal layers sit at z-index 400 to 1000). Fixed; guarded by a browser test that checks what is actually under the bar.
+- **On iPhones with a home indicator the bottom tab bar lost about half its height** (the safe-area padding was taken out of a fixed height instead of added to it). Fixed. Not verified on a real iPhone: browsers on a PC report no safe area, so this one rests on reading the CSS.
+- Landscape iPhones with a notch: content could sit under the notch; side safe-area padding added to the top bar, page and tab bar.
+- Buttons stayed lifted after a tap on phones (hover effects now only where a real hover exists).
+- Wrapped segmented buttons (Explore categories) were clipped by a pill-shaped border; long dialogs now use dynamic viewport height so a phone's address bar cannot hide the bottom.
+- Windows high-contrast mode would have hidden progress bars and selected states; added rules. Decorative emoji now have a plain fallback for browsers without the alt-text syntax.
+- Removed unused rules; the app manifest no longer locks portrait orientation and its colours match the current theme.
+
 **First run on GitHub's servers (a different browser and fonts than the developer PC):**
 - **The Expenses table scrolled sideways on phones** (22 px too wide at 375 px) with Linux's wider fonts, though it fit on Windows. Table cells on phones can now break long words and use tighter buttons.
 - Two tests raced a slower machine (they moved on before an erase or restore had finished, or looked for the opened file after it had already downloaded). Fixed in the tests; the app was right.

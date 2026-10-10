@@ -38,6 +38,8 @@ export interface Place {
   id: string; // e.g. "node/123"
   name: string;
   kind: string; // human label, e.g. "Beach"
+  /** One or two short sentences built only from what OpenStreetMap says about the place; null when it says nothing useful. */
+  summary: string | null;
   category: ExploreCategory;
   lat: number;
   lng: number;
@@ -78,6 +80,60 @@ export function kindLabel(tags: Record<string, string>): string {
   return 'Place';
 }
 
+const SUMMARY_MAX = 160;
+const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const words = (v: string) => v.replace(/_/g, ' ').trim();
+const joinAnd = (items: string[]) => (items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
+/** Cut at a word boundary so a description never ends mid-word. */
+function clip(text: string, max = SUMMARY_MAX): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), max / 2)).replace(/[\s,;:.-]+$/, '')}…`;
+}
+
+/** Nationalities and regions are proper adjectives ("Italian"); dishes and styles are not ("seafood"). */
+const PROPER = new Set(['american', 'asian', 'african', 'argentinian', 'brazilian', 'british', 'cajun', 'caribbean', 'chinese', 'colombian', 'cuban', 'dominican', 'ethiopian', 'filipino', 'french', 'german', 'greek', 'hawaiian', 'indian', 'indonesian', 'international', 'irish', 'italian', 'jamaican', 'japanese', 'korean', 'lebanese', 'malaysian', 'mediterranean', 'mexican', 'middle eastern', 'moroccan', 'nepalese', 'peruvian', 'polish', 'portuguese', 'russian', 'spanish', 'tex-mex', 'thai', 'turkish', 'vietnamese']);
+function cuisineName(raw: string): string {
+  const w = words(raw).toLowerCase();
+  const multi = w.includes(' ');
+  return PROPER.has(w) || (multi && /^(puerto|latin|new|south|north|central|east|west|middle|san|el|la)\b/.test(w)) ? w.replace(/\b\w/g, (c) => c.toUpperCase()) : w;
+}
+
+/**
+ * A short description for a place, from its OpenStreetMap tags and nothing else (no guessing, no extra lookups).
+ * A mapper-written description wins; otherwise the useful facts are put into a sentence, e.g.
+ * "Seafood and Puerto Rican restaurant. Has outdoor seating and offers takeaway." Returns null when there is nothing
+ * to say beyond the place type that is already shown as a badge.
+ */
+export function describePlace(tags: Record<string, string>, kind: string): string | null {
+  const written = (tags['description:en'] ?? tags.description ?? '').replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+  if (written.length >= 12) return clip(written);
+
+  const cuisines = (tags.cuisine ?? '').split(';').map((c) => cuisineName(c)).filter((c) => c && c.toLowerCase() !== 'yes').slice(0, 3);
+  const lead = cuisines.length ? `${sentenceCase(joinAnd(cuisines))} ${kind.toLowerCase()}` : null;
+
+  const facts: string[] = [];
+  if (tags.outdoor_seating === 'yes') facts.push('has outdoor seating');
+  if (tags.takeaway === 'yes' || tags.takeaway === 'only') facts.push('offers takeaway');
+  if (tags.fee === 'no') facts.push('free to visit');
+  else if (tags.fee === 'yes') facts.push('has an entry fee');
+  if (tags.wheelchair === 'yes') facts.push('wheelchair accessible');
+  else if (tags.wheelchair === 'limited') facts.push('limited wheelchair access');
+  if (tags.heritage || tags['heritage:operator']) facts.push('heritage listed');
+  const year = /^~?\s*(\d{3,4})/.exec(tags.start_date ?? '')?.[1];
+  if (year && Number(year) <= new Date().getFullYear()) facts.push(`dates from ${year}`);
+  const ele = Number(tags.ele);
+  if (Number.isFinite(ele) && ele > 0 && (tags.natural === 'peak' || tags.natural === 'cave_entrance')) facts.push(`${Math.round(ele).toLocaleString('en-US')} m (${Math.round(ele * 3.281).toLocaleString('en-US')} ft) above sea level`);
+  const operator = (tags.operator ?? '').trim();
+  if (operator && operator.length <= 40 && operator.toLowerCase() !== (tags.name ?? '').trim().toLowerCase()) facts.push(`run by ${operator}`);
+
+  const shown = facts.slice(0, 3);
+  const rest = shown.length ? `${sentenceCase(joinAnd(shown))}.` : null;
+  if (lead && rest) return clip(`${lead}. ${rest}`);
+  if (lead) return `${lead}.`;
+  return rest ? clip(rest) : null;
+}
+
 const safeUrl = (u: string | undefined): string | null => (u && /^https?:\/\//i.test(u.trim()) ? u.trim() : null);
 
 function addressOf(t: Record<string, string>): string | null {
@@ -110,6 +166,7 @@ export function parsePlaces(json: unknown, cat: ExploreCategory, centerLat: numb
       id: `${e.type}/${e.id}`,
       name,
       kind: kindLabel(tags),
+      summary: describePlace(tags, kindLabel(tags)),
       category: cat,
       lat,
       lng,

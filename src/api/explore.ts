@@ -3,7 +3,7 @@ import { buildOverpassQuery, parsePlaces, type ExploreCategory, type Place } fro
 
 const ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const TTL_MS = 24 * 60 * 60 * 1000;
-const key = (c: ExploreCategory, lat: number, lng: number, r: number) => `tripnest:explore:v2:${c}:${lat.toFixed(2)}:${lng.toFixed(2)}:${r}`;
+const key = (c: ExploreCategory, lat: number, lng: number, r: number) => `tripnest:explore:v3:${c}:${lat.toFixed(2)}:${lng.toFixed(2)}:${r}`;
 
 function readCache(k: string): Place[] | null {
   try {
