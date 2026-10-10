@@ -11,6 +11,7 @@ import { packingProgress, visibleItems } from '../../lib/packing';
 import { dayIndex, durationText, formatDateRange } from '../../lib/trip';
 import { formatDateLong } from '../../lib/time';
 import { ErrorBanner, download } from '../../components/ui';
+import { canShareFiles, shareOrDownload } from '../../components/share';
 import ItemRow from '../../components/ItemRow';
 import { KIND_LABELS, ReservationCard } from './Reservations';
 
@@ -33,6 +34,11 @@ export default function Export() {
     if (f) download(backupFileName(trip.name), JSON.stringify(f), 'application/json');
   };
 
+  const shareTrip = async () => {
+    const f = await file.run(() => exportData({ tripId: trip.id, includeFiles: withFiles }));
+    if (f) await shareOrDownload(backupFileName(trip.name), JSON.stringify(f), 'application/json', `${trip.name} (TripNest trip)`);
+  };
+
   const ics = () => download(`${trip.name.replace(/[^\w]+/g, '-').toLowerCase() || 'trip'}.ics`, buildIcs(trip.name, data.items.map(icsItem)), 'text/calendar;charset=utf-8');
 
   return (
@@ -51,6 +57,7 @@ export default function Export() {
         <ErrorBanner message={file.error} />
         <label className="check"><input type="checkbox" checked={withFiles} onChange={(e) => setWithFiles(e.target.checked)} /> Include uploaded documents ({data.documents.length})</label>
         <button className="btn" onClick={saveTrip} disabled={file.busy}>{file.busy ? 'Preparing…' : 'Save trip to a file'}</button>
+        {canShareFiles() && <button className="btn btn-primary" style={{ marginLeft: 8 }} onClick={shareTrip} disabled={file.busy}>Share trip…</button>}
       </section>
 
       <article aria-label="Printable trip booklet">

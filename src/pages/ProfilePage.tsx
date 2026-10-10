@@ -3,6 +3,8 @@ import { backupFileName, eraseEverything, exportData, parseBackup, restoreAll } 
 import { storageEstimate } from '../api/db';
 import { getSettings, saveSettings } from '../api/settings';
 import { Alert, Dialog, ErrorBanner, Field, download } from '../components/ui';
+import { canShareFiles, shareOrDownload } from '../components/share';
+import { markBackedUp } from '../api/device';
 import RecentlyDeleted from '../components/RecentlyDeleted';
 import { useAction } from '../hooks/hooks';
 import { browserTimeZone, COMMON_TIMEZONES, isValidTimeZone } from '../lib/time';
@@ -37,7 +39,14 @@ export default function ProfilePage() {
   const doBackup = async () => {
     setMsg(null);
     const file = await backup.run(() => exportData({ includeFiles: withFiles }));
-    if (file) { download(backupFileName(), JSON.stringify(file), 'application/json'); setMsg('Backup downloaded. Keep it somewhere safe, like your email or cloud drive.'); }
+    if (file) { download(backupFileName(), JSON.stringify(file), 'application/json'); markBackedUp(); setMsg('Backup downloaded. Keep it somewhere safe, like your email or cloud drive.'); }
+  };
+  const doShare = async () => {
+    setMsg(null);
+    const file = await backup.run(() => exportData({ includeFiles: withFiles }));
+    if (!file) return;
+    const r = await shareOrDownload(backupFileName(), JSON.stringify(file), 'application/json', 'TripNest backup');
+    if (r !== 'cancelled') { markBackedUp(); setMsg(r === 'shared' ? 'Backup shared. Keep it somewhere safe.' : 'Backup downloaded. Keep it somewhere safe, like your email or cloud drive.'); }
   };
 
   const onRestorePick = async (f: File | undefined) => {
@@ -85,6 +94,7 @@ export default function ProfilePage() {
         <label className="check"><input type="checkbox" checked={withFiles} onChange={(e) => setWithFiles(e.target.checked)} /> Include uploaded documents (makes the file bigger)</label>
         <div className="row" style={{ marginTop: 8 }}>
           <button className="btn btn-primary" onClick={doBackup} disabled={backup.busy}>{backup.busy ? 'Preparing…' : 'Download a backup'}</button>
+          {canShareFiles() && <button className="btn" onClick={doShare} disabled={backup.busy}>Share backup…</button>}
           <label className="btn">
             Restore from a backup…
             <input ref={restoreRef} type="file" accept="application/json,.json" className="sr-only" onChange={(e) => void onRestorePick(e.target.files?.[0])} />

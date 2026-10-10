@@ -6,6 +6,7 @@ import type { Trip } from '../api/types';
 import { Alert, Empty, ErrorBanner, Spinner, StatusBadge } from '../components/ui';
 import { useAction } from '../hooks/hooks';
 import { DATA_CHANGED } from '../components/Toast';
+import BackupNudges from '../components/BackupNudges';
 import { formatDateRange, tripDuration } from '../lib/trip';
 
 export default function TripsPage() {
@@ -53,6 +54,7 @@ export default function TripsPage() {
         </div>
       </div>
       {notice && <Alert kind="success">{notice}</Alert>}
+      <BackupNudges trips={list} />
       <ErrorBanner message={imp.error} />
       {shown.length === 0 ? (
         <Empty title="No trips yet">Create your first trip, or import a trip file someone sent you.</Empty>
