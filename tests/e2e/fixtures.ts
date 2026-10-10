@@ -122,11 +122,20 @@ export async function seedSampleTrip(page: Page): Promise<string> {
 }
 
 /**
- * A stored file opened in a new tab must really arrive. Browsers with a PDF viewer (Edge) navigate the tab to a blob: URL;
- * headless Chromium has no viewer, so the same PDF becomes a download instead. Either proves the file came out of storage.
+ * Click something that opens a stored file in a new tab, and prove the file arrived. Browsers with a PDF viewer (Edge)
+ * navigate the tab to a blob: URL; headless Chromium has no viewer, so the same PDF becomes a download instead.
+ * Listeners are attached before the click because that download can start immediately.
  */
-export async function expectFileOpened(popup: Page): Promise<void> {
-  const opened = (async () => { for (let i = 0; i < 100; i++) { if (popup.url().startsWith('blob:')) return 'blob'; await popup.waitForTimeout(100); } throw new Error(`The new tab never opened the file (it stayed at ${popup.url()})`); })();
-  const downloaded = popup.waitForEvent('download', { timeout: 10_000 }).then(() => 'download');
-  await Promise.any([opened, downloaded]);
+export async function clickAndExpectFileOpened(page: Page, click: () => Promise<void>): Promise<void> {
+  const context = page.context();
+  const arrived = new Promise<string>((resolve) => {
+    page.on('download', () => resolve('download'));
+    context.on('page', (p) => {
+      p.on('download', () => resolve('download'));
+      const timer = setInterval(() => { if (p.url().startsWith('blob:')) { clearInterval(timer); resolve('blob'); } }, 50);
+      p.on('close', () => clearInterval(timer));
+    });
+  });
+  await click();
+  await Promise.race([arrived, new Promise((_, no) => setTimeout(() => no(new Error('The new tab never opened the file')), 10_000))]);
 }

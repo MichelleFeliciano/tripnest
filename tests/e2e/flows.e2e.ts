@@ -4,7 +4,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { expectFileOpened, seedSampleTrip } from './fixtures';
+import { clickAndExpectFileOpened, seedSampleTrip } from './fixtures';
 
 async function createTrip(page: Page, name = 'Lake Weekend') {
   await page.goto('/trips/new');
@@ -53,7 +53,7 @@ test('deleting an expense offers Undo, and the expense comes back unchanged', as
   await expect(page.getByRole('status').filter({ hasText: 'Restored' })).toBeVisible();
 });
 
-test('a deleted trip and a deleted document can be restored from Profile, files included', async ({ page, context }) => {
+test('a deleted trip and a deleted document can be restored from Profile, files included', async ({ page }) => {
   const tripId = await seedSampleTrip(page); // has a stored PDF
   // delete the document, then undo
   await page.goto(`/trips/${tripId}/documents`);
@@ -62,8 +62,7 @@ test('a deleted trip and a deleted document can be restored from Profile, files 
   await expect(page.locator('main')).not.toContainText('hotel-confirmation.pdf');
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.locator('main')).toContainText('hotel-confirmation.pdf');
-  const [popup] = await Promise.all([context.waitForEvent('page'), page.getByRole('button', { name: 'Open hotel-confirmation.pdf' }).click()]);
-  await expectFileOpened(popup); // the file itself came back
+  await clickAndExpectFileOpened(page, () => page.getByRole('button', { name: 'Open hotel-confirmation.pdf' }).click()); // the file itself came back
 
   // delete the whole trip, then restore it from Profile
   await page.goto(`/trips/${tripId}/settings`);
@@ -226,12 +225,14 @@ test('back up, erase everything, restore: the trip comes back exactly', async ({
   await page.getByRole('button', { name: 'Erase all data on this device…' }).click();
   await page.getByLabel('Type ERASE to confirm').fill('ERASE');
   await page.getByRole('button', { name: 'Erase everything' }).click();
+  await expect(page.getByText('Everything on this device was erased.')).toBeVisible(); // wait for it to finish before looking
   await page.goto('/trips');
   await expect(page.locator('main')).toContainText('No trips yet');
 
   await page.goto('/profile');
   await page.locator('input[type=file]').first().setInputFiles(file);
   await page.getByRole('button', { name: 'Replace everything' }).click();
+  await expect(page.getByText('Backup restored.')).toBeVisible();
   await page.goto('/trips');
   await page.getByRole('link', { name: 'Backup Trip' }).click();
   await page.getByRole('link', { name: 'Expenses' }).last().click();

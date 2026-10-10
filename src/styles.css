@@ -158,7 +158,7 @@ th { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-sp
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.num { white-space: nowrap; }
 @media (min-width: 720px) { td.num .muted { display: none; } } /* the note has its own column on wide screens */
-@media (max-width: 719px) { th, td { padding: 8px 6px; } .card { padding: 14px; } .container { padding-inline: 14px; } }
+@media (max-width: 719px) { th, td { padding: 8px 6px; overflow-wrap: anywhere; } td.num { overflow-wrap: normal; } td .btn-sm { padding-inline: .55rem; } .card { padding: 14px; } .container { padding-inline: 14px; } }
 @media (max-width: 360px) { /* very small phones */
   .container { padding-inline: 10px; }
   .card { padding: 12px; }
