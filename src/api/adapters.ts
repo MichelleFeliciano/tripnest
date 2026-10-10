@@ -29,6 +29,7 @@ export const icsItem = (r: ItineraryRow): IcsItem => ({
   endTz: r.end_tz,
   website: r.website,
   confirmationNumber: r.confirmation_number,
+  itemType: r.item_type,
 });
 
 export const expenseLike = (e: Expense): ExpenseLike => ({

@@ -3,7 +3,7 @@ import { useTrip } from '../../hooks/contexts';
 import { useAction } from '../../hooks/hooks';
 import { backupFileName, exportData } from '../../api/backup';
 import { expenseLike, icsItem, itemLike, nameOf, packingLike, settlementLike } from '../../api/adapters';
-import { buildIcs } from '../../lib/ics';
+import { buildIcs, REMINDER_CHOICES } from '../../lib/ics';
 import { groupByDay } from '../../lib/itinerary';
 import { computeNetBalances, suggestSettlements, totalsByCurrency, NO_CONVERSION_NOTICE } from '../../lib/balances';
 import { formatMoney } from '../../lib/money';
@@ -39,7 +39,8 @@ export default function Export() {
     if (f) await shareOrDownload(backupFileName(trip.name), JSON.stringify(f), 'application/json', `${trip.name} (TripNest trip)`);
   };
 
-  const ics = () => download(`${trip.name.replace(/[^\w]+/g, '-').toLowerCase() || 'trip'}.ics`, buildIcs(trip.name, data.items.map(icsItem)), 'text/calendar;charset=utf-8');
+  const [reminder, setReminder] = useState<number | null>(60);
+  const ics = () => download(`${trip.name.replace(/[^\w]+/g, '-').toLowerCase() || 'trip'}.ics`, buildIcs(trip.name, data.items.map(icsItem), new Date(), { reminderMinutes: reminder }), 'text/calendar;charset=utf-8');
 
   return (
     <div>
@@ -49,6 +50,11 @@ export default function Export() {
         <div className="row">
           <button className="btn btn-primary" onClick={() => window.print()}>Print / Save as PDF</button>
           <button className="btn" onClick={ics} disabled={data.items.length === 0}>Download calendar (.ics)</button>
+          <label className="row" style={{ gap: 6 }}>Reminders
+            <select value={reminder ?? ''} onChange={(e) => setReminder(e.target.value === '' ? null : Number(e.target.value))} style={{ width: 'auto' }}>
+              {REMINDER_CHOICES.map((c) => <option key={c.label} value={c.minutes ?? ''}>{c.label}</option>)}
+            </select>
+          </label>
         </div>
         <p className="muted">The calendar file works with Apple, Google and Outlook calendars. Times are exact moments, so they show correctly in whichever zone your calendar uses.</p>
         <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '16px 0' }} />

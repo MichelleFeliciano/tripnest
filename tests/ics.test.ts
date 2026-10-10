@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildIcs, escapeText, foldLine, type IcsItem } from '../src/lib/ics';
+import { buildIcs, escapeText, foldLine, triggerFor, REMINDER_CHOICES, type IcsItem } from '../src/lib/ics';
 import { zonedToUtc } from '../src/lib/time';
 
 const flight: IcsItem = {
@@ -59,5 +59,43 @@ describe('ICS export', () => {
     expect(folded.replace(/\r\n /g, '')).toBe('X'.repeat(200));
     const emoji = foldLine('SUMMARY:' + '✈️'.repeat(50));
     expect(emoji.replace(/\r\n /g, '')).toBe('SUMMARY:' + '✈️'.repeat(50));
+  });
+});
+
+describe('ICS reminders', () => {
+  const timed = { ...flight, itemType: 'flight' };
+  const hotel: IcsItem = { ...flight, id: 'h1', title: 'Hotel check-in', itemType: 'hotel' };
+  const alarms = (ics: string) => ics.match(/BEGIN:VALARM/g)?.length ?? 0;
+  const now = new Date('2026-01-01T00:00:00Z');
+
+  it('adds nothing unless asked', () => {
+    expect(alarms(buildIcs('T', [timed], now))).toBe(0);
+    expect(alarms(buildIcs('T', [timed], now, { reminderMinutes: null }))).toBe(0);
+  });
+  it('writes a display alarm that fires the chosen time before a timed event', () => {
+    const ics = buildIcs('T', [timed], now, { reminderMinutes: 180 }).replace(/\r\n /g, '');
+    expect(ics).toContain('BEGIN:VALARM\r\nACTION:DISPLAY\r\n');
+    expect(ics).toContain('TRIGGER:-PT3H');
+    expect(ics).toContain('DESCRIPTION:Flight' + String.fromCharCode(92) + ', AUS → SJU in 3 hours'); // the comma is escaped
+    // the alarm is inside its event
+    expect(ics.indexOf('BEGIN:VALARM')).toBeGreaterThan(ics.indexOf('BEGIN:VEVENT'));
+    expect(ics.indexOf('END:VALARM')).toBeLessThan(ics.indexOf('END:VEVENT'));
+  });
+  it('skips all-day items, hotels and free time', () => {
+    expect(alarms(buildIcs('T', [allDay, hotel, { ...timed, id: 'f2', itemType: 'free_time' }], now, { reminderMinutes: 60 }))).toBe(0);
+  });
+  it('uses valid durations for every choice', () => {
+    expect(triggerFor(30)).toBe('-PT30M');
+    expect(triggerFor(60)).toBe('-PT1H');
+    expect(triggerFor(90)).toBe('-PT90M');
+    expect(triggerFor(1440)).toBe('-P1D');
+    expect(triggerFor(2880)).toBe('-P2D');
+    for (const bad of [0, -5, 1.5, NaN, 99999]) expect(() => triggerFor(bad)).toThrow();
+    for (const c of REMINDER_CHOICES) if (c.minutes !== null) expect(triggerFor(c.minutes)).toMatch(/^-P(T\d+[HM]|\d+D)$/);
+  });
+  it('keeps lines short and the file well-formed with alarms present', () => {
+    const ics = buildIcs('T', [timed, allDay], now, { reminderMinutes: 60 });
+    expect(ics.split('\r\n').every((l) => new TextEncoder().encode(l).length <= 75)).toBe(true);
+    expect(ics.match(/BEGIN:VALARM/g)).toHaveLength(ics.match(/END:VALARM/g)!.length);
   });
 });
