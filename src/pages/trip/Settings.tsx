@@ -3,11 +3,12 @@ import { useToast } from '../../components/Toast';
 import type { Deleted } from '../../api/api';
 import { useNavigate } from 'react-router-dom';
 import { trips } from '../../api/api';
+import { copyTrip } from '../../api/copyTrip';
 import { useTrip } from '../../hooks/contexts';
 import { useAction } from '../../hooks/hooks';
 import { COMMON_CURRENCIES } from '../../lib/money';
 import { STATUS_LABELS, TRIP_STATUSES, tripDuration, validateTrip, type TripStatus } from '../../lib/trip';
-import { Alert, ErrorBanner, Field } from '../../components/ui';
+import { Alert, Dialog, ErrorBanner, Field } from '../../components/ui';
 
 export default function Settings() {
   const { data, reload } = useTrip();
@@ -23,6 +24,8 @@ export default function Settings() {
   }, [t]);
   const [errs, setErrs] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [cp, setCp] = useState({ name: '', startDate: '', itinerary: true, packing: true, todo: true, budget: true, notes: true });
   const { busy, error, run } = useAction();
   const dur = f.end_date >= f.start_date ? tripDuration(f.start_date, f.end_date) : null;
 
@@ -40,6 +43,13 @@ export default function Settings() {
   const archive = async () => {
     const ok = await run(async () => { await trips.update(t.id, { status: t.status === 'archived' ? 'planning' : 'archived' }); return true; });
     if (ok) await reload();
+  };
+  const openCopy = () => { setCp((c) => ({ ...c, name: `${t.name} (copy)`.slice(0, 120), startDate: t.start_date })); setCopyOpen(true); };
+  const doCopy = async (e: FormEvent) => {
+    e.preventDefault();
+    let id: string | undefined;
+    const ok = await run(async () => { id = await copyTrip(t.id, cp); return true; });
+    if (ok && id) { setCopyOpen(false); toast.say('Trip copied. This is the new one.'); nav(`/trips/${id}`); }
   };
   const del = async () => {
     if (window.prompt(`This deletes the trip and everything in it, including documents.\nYou can restore it for 30 days from Profile → Recently deleted.\nType the trip name to confirm:`) !== t.name) return;
@@ -71,13 +81,32 @@ export default function Settings() {
         <button className="btn btn-primary" disabled={busy}>Save settings</button>
       </form>
       <section className="card">
+        <h3>Use as a template</h3>
+        <p className="muted">Start a new trip from this one. Money spent, documents, bookings and confirmation numbers stay behind.</p>
+        <button className="btn" onClick={openCopy} disabled={busy}>Copy this trip…</button>
+      </section>
+      <section className="card">
         <h3>Archive or delete</h3>
         <div className="row">
           <button className="btn" onClick={archive} disabled={busy}>{t.status === 'archived' ? 'Restore from archive' : 'Archive trip'}</button>
           <button className="btn btn-danger" onClick={del} disabled={busy}>Delete trip…</button>
         </div>
-        <p className="muted">Archiving hides the trip from your main list but keeps everything. Deleting is permanent.</p>
+        <p className="muted">Archiving hides the trip from your main list but keeps everything. Deleted trips can be brought back for 30 days from Profile → Recently deleted.</p>
       </section>
+      <Dialog open={copyOpen} onClose={() => setCopyOpen(false)} title="Copy this trip">
+        <form onSubmit={doCopy}>
+          <ErrorBanner message={error} />
+          <Field label="New trip name">{(id) => <input id={id} value={cp.name} onChange={(e) => setCp({ ...cp, name: e.target.value })} maxLength={120} required />}</Field>
+          <Field label="New start date" hint="Everything is moved by the same number of days">{(id, d) => <input id={id} aria-describedby={d} type="date" value={cp.startDate} onChange={(e) => setCp({ ...cp, startDate: e.target.value })} required />}</Field>
+          <fieldset style={{ border: 0, padding: 0, margin: '8px 0' }}>
+            <legend>Bring along</legend>
+            {([['itinerary', 'Itinerary'], ['packing', 'Packing lists (all unpacked)'], ['todo', 'To-do list (all not done)'], ['budget', 'Budgets'], ['notes', 'Notes']] as const).map(([k, label]) => (
+              <label key={k} className="check"><input type="checkbox" checked={cp[k]} onChange={(e) => setCp({ ...cp, [k]: e.target.checked })} /> {label}</label>
+            ))}
+          </fieldset>
+          <div className="row"><button className="btn btn-primary" disabled={busy}>{busy ? 'Copying…' : 'Create the copy'}</button><button type="button" className="btn" onClick={() => setCopyOpen(false)}>Cancel</button></div>
+        </form>
+      </Dialog>
     </div>
   );
 }

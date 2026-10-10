@@ -88,6 +88,13 @@ export default function Export() {
           ))}
         </section>
 
+        {data.tasks.length > 0 && (
+          <section className="card">
+            <h2>To-do list</h2>
+            <ul style={{ listStyle: 'none', paddingLeft: 0 }}>{data.tasks.map((t) => <li key={t.id}>{t.done ? '☑' : '☐'} {t.title}{t.due_date ? ` (due ${t.due_date})` : ''}</li>)}</ul>
+          </section>
+        )}
+
         <section className="card">
           <h2>Expense summary</h2>
           <p>Total: {Object.entries(totals).map(([c, v]) => formatMoney(v, c)).join(' · ') || '—'}{Object.keys(totals).length > 1 && ` (${NO_CONVERSION_NOTICE})`}</p>

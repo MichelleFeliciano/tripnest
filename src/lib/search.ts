@@ -1,5 +1,5 @@
 export interface SearchDoc {
-  kind: 'itinerary' | 'reservation' | 'note' | 'packing' | 'expense';
+  kind: 'itinerary' | 'reservation' | 'note' | 'packing' | 'expense' | 'todo';
   id: string;
   title: string;
   detail: string;

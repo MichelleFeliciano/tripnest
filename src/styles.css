@@ -103,6 +103,7 @@ p { margin: .25rem 0 .75rem; }
 .btn:active { transform: none; }
 .btn-primary { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: var(--brand-ink); border-color: transparent; }
 .btn-primary:hover { border-color: transparent; }
+.overdue { color: var(--danger); }
 .btn-danger { color: var(--danger); border-color: var(--danger); }
 .btn-ghost { border-color: transparent; background: transparent; }
 .btn-ghost:hover { background: var(--brand-soft); box-shadow: none; transform: none; }

@@ -7,6 +7,7 @@ import { localDate, browserTimeZone } from '../../lib/time';
 import { packingProgress, visibleItems } from '../../lib/packing';
 import { totalsByCurrency, NO_CONVERSION_NOTICE, computeNetBalances, suggestSettlements } from '../../lib/balances';
 import { formatMoney } from '../../lib/money';
+import { openTaskCounts } from '../../lib/tasks';
 import { durationText, formatDateRange } from '../../lib/trip';
 import ItemRow from '../../components/ItemRow';
 import DestinationsCard from '../../components/DestinationsCard';
@@ -91,6 +92,15 @@ export default function Overview() {
           <ProgressBar value={shared.percent} label="Shared packing progress" />
           {mine.total > 0 && <p style={{ marginTop: 12 }}><strong>{mine.packed} / {mine.total}</strong> of your personal list ({mine.percent}%)</p>}
           <Link to={`${base}/packing`}>Open packing list →</Link>
+        </section>
+
+        <section className="card" aria-labelledby="todo-h">
+          <h2 id="todo-h">To-do before you go</h2>
+          {data.tasks.length === 0 ? <p className="muted">Nothing on the list yet.</p> : (() => {
+            const c = openTaskCounts(data.tasks, localDate(now, browserTimeZone()));
+            return <p><strong>{c.open}</strong> still to do{c.overdue > 0 && <strong className="overdue"> · {c.overdue} overdue</strong>}</p>;
+          })()}
+          <Link to={`${base}/todo`}>Open to-do list →</Link>
         </section>
 
         <DestinationsCard />

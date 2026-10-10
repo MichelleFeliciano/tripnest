@@ -285,3 +285,39 @@ test('deleting a trip removes it for good', async ({ page }) => {
   await expect(page).toHaveURL(/\/trips$/);
   await expect(page.locator('main')).toContainText('No trips yet');
 });
+
+test('to-do list: add from an idea, tick it off, search finds it, and the trip can be copied as a template', async ({ page }) => {
+  await createTrip(page, 'Template Source');
+  const base = page.url().replace(/\/$/, '');
+  await page.goto(base + '/todo');
+  await page.getByLabel('What needs doing?').fill('Renew passport');
+  await page.getByLabel('Due (optional)').fill('2020-01-01');
+  await page.getByRole('button', { name: 'Add to-do' }).click();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Renew passport' })).toContainText('Overdue');
+  await page.getByRole('button', { name: '+ Book flights' }).click();
+  await expect(page.getByRole('button', { name: '+ Book flights' })).toHaveCount(0); // added, so no longer an idea
+  await page.getByRole('checkbox', { name: /Book flights/ }).click();
+  await expect(page.getByRole('checkbox', { name: /Book flights/ })).toBeChecked();
+  await expect(page.locator('main')).toContainText('1 / 2');
+
+  // survives a reload; shows on the overview and in search
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: /Book flights/ })).toBeChecked();
+  await page.goto(base);
+  await expect(page.locator('main')).toContainText('1 still to do · 1 overdue');
+  await page.goto(base + '/search');
+  await page.getByLabel(/Search itinerary/).fill('passport');
+  await expect(page.locator('main')).toContainText('Renew passport');
+
+  // copy it as a template for next year
+  await page.goto(base + '/settings');
+  await page.getByRole('button', { name: 'Copy this trip…' }).click();
+  await page.getByLabel('New trip name').fill('Template Next Year');
+  await page.getByLabel('New start date').fill('2028-06-12');
+  await page.getByRole('button', { name: 'Create the copy' }).click();
+  await expect(page.getByRole('heading', { name: 'Template Next Year' })).toBeVisible();
+  await expect(page.locator('main')).toContainText('June 12–14, 2028');
+  await page.goto(page.url().replace(/\/$/, '') + '/todo');
+  await expect(page.getByRole('checkbox', { name: /Book flights/ })).not.toBeChecked(); // everything starts undone
+  await expect(page.getByRole('checkbox', { name: /Renew passport/ })).toBeVisible();
+});
