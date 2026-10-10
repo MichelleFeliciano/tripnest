@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { backupFileName, eraseEverything, exportData, parseBackup, restoreAll } from '../api/backup';
+import { backupFileName, eraseEverything, exportData, makeBackupText, openBackup, restoreAll, type BackupFile } from '../api/backup';
+import { ProtectOption, usePasswordPrompt, useProtectOption } from '../components/BackupPassword';
 import { storageEstimate } from '../api/db';
 import { getSettings, saveSettings } from '../api/settings';
 import { Alert, Dialog, ErrorBanner, Field, download } from '../components/ui';
@@ -20,7 +21,9 @@ export default function ProfilePage() {
   const [eraseOpen, setEraseOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const restoreRef = useRef<HTMLInputElement>(null);
-  const [pendingRestore, setPendingRestore] = useState<ReturnType<typeof parseBackup> | null>(null);
+  const [pendingRestore, setPendingRestore] = useState<BackupFile | null>(null);
+  const protect = useProtectOption();
+  const prompt = usePasswordPrompt();
   const save = useAction();
   const backup = useAction();
   const restore = useAction();
@@ -38,21 +41,21 @@ export default function ProfilePage() {
 
   const doBackup = async () => {
     setMsg(null);
-    const file = await backup.run(() => exportData({ includeFiles: withFiles }));
-    if (file) { download(backupFileName(), JSON.stringify(file), 'application/json'); markBackedUp(); setMsg('Backup downloaded. Keep it somewhere safe, like your email or cloud drive.'); }
+    const text = await backup.run(async () => makeBackupText(await exportData({ includeFiles: withFiles }), protect.password));
+    if (text) { download(backupFileName(), text, 'application/json'); markBackedUp(); setMsg(`Backup downloaded${protect.password ? ' and locked with your password' : ''}. Keep it somewhere safe, like your email or cloud drive.`); }
   };
   const doShare = async () => {
     setMsg(null);
-    const file = await backup.run(() => exportData({ includeFiles: withFiles }));
-    if (!file) return;
-    const r = await shareOrDownload(backupFileName(), JSON.stringify(file), 'application/json', 'TripNest backup');
+    const text = await backup.run(async () => makeBackupText(await exportData({ includeFiles: withFiles }), protect.password));
+    if (!text) return;
+    const r = await shareOrDownload(backupFileName(), text, 'application/json', 'TripNest backup');
     if (r !== 'cancelled') { markBackedUp(); setMsg(r === 'shared' ? 'Backup shared. Keep it somewhere safe.' : 'Backup downloaded. Keep it somewhere safe, like your email or cloud drive.'); }
   };
 
   const onRestorePick = async (f: File | undefined) => {
     setMsg(null);
     if (!f) return;
-    const parsed = await restore.run(async () => parseBackup(await f.text()));
+    const parsed = await restore.run(async () => openBackup(await f.text(), prompt.ask));
     if (restoreRef.current) restoreRef.current.value = '';
     if (parsed) setPendingRestore(parsed);
   };
@@ -92,9 +95,10 @@ export default function ProfilePage() {
         <p>Because everything is stored only on this device, a backup file protects you if the browser data is cleared or you get a new phone. It also lets you move trips to another device.</p>
         <ErrorBanner message={backup.error ?? restore.error} />
         <label className="check"><input type="checkbox" checked={withFiles} onChange={(e) => setWithFiles(e.target.checked)} /> Include uploaded documents (makes the file bigger)</label>
+        <ProtectOption o={protect} />
         <div className="row" style={{ marginTop: 8 }}>
-          <button className="btn btn-primary" onClick={doBackup} disabled={backup.busy}>{backup.busy ? 'Preparing…' : 'Download a backup'}</button>
-          {canShareFiles() && <button className="btn" onClick={doShare} disabled={backup.busy}>Share backup…</button>}
+          <button className="btn btn-primary" onClick={doBackup} disabled={backup.busy || (protect.on && !protect.password)}>{backup.busy ? 'Preparing…' : 'Download a backup'}</button>
+          {canShareFiles() && <button className="btn" onClick={doShare} disabled={backup.busy || (protect.on && !protect.password)}>Share backup…</button>}
           <label className="btn">
             Restore from a backup…
             <input ref={restoreRef} type="file" accept="application/json,.json" className="sr-only" onChange={(e) => void onRestorePick(e.target.files?.[0])} />
@@ -105,6 +109,7 @@ export default function ProfilePage() {
       </section>
 
       <RecentlyDeleted />
+      {prompt.dialog}
 
       <section className="card" aria-labelledby="er-h" style={{ borderColor: 'var(--danger)' }}>
         <h2 id="er-h">Erase everything</h2>

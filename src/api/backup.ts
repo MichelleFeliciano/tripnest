@@ -13,6 +13,7 @@ import { BUDGET_CATEGORIES, EXPENSE_CATEGORIES } from '../lib/budget';
 import { isValidTimeZone } from '../lib/time';
 import { ITEM_TYPES } from '../lib/itinerary';
 import { uuid } from '../lib/uuid';
+import { WrongPasswordError, decryptBackup, encryptBackup, isEncryptedBackup } from './crypto';
 
 export const BACKUP_FORMAT = 1;
 export const MAX_BACKUP_BYTES = 150 * 1024 * 1024;
@@ -83,8 +84,30 @@ const isCode = (v: unknown) => typeof v === 'string' && /^[A-Z]{3}$/.test(v);
 const instant = (v: unknown) => v === null || v === undefined || (typeof v === 'string' && Number.isFinite(Date.parse(v)));
 const RESERVATION_KINDS = ['flight', 'hotel', 'restaurant', 'activity', 'car_rental', 'other'];
 
+/** The text to save or share: the plain file, or the same file locked with a password. */
+export async function makeBackupText(file: BackupFile, password: string | null): Promise<string> {
+  const plain = JSON.stringify(file);
+  return password ? encryptBackup(plain, password) : plain;
+}
+
+/**
+ * Opens a backup or trip file's text. A password-protected file asks for the password (as many times as it takes);
+ * returns null if the person gives up.
+ */
+export async function openBackup(text: string, askPassword: (wasWrong: boolean) => Promise<string | null>): Promise<BackupFile | null> {
+  if (!isEncryptedBackup(text)) return parseBackup(text);
+  let wasWrong = false;
+  for (;;) {
+    const password = await askPassword(wasWrong);
+    if (password === null) return null;
+    try { return parseBackup(await decryptBackup(text, password)); }
+    catch (e) { if (e instanceof WrongPasswordError) { wasWrong = true; continue; } throw e; }
+  }
+}
+
 /** Parse and structurally validate a backup/trip file. Throws ApiError with a plain-language reason. */
 export function parseBackup(text: string): BackupFile {
+  if (isEncryptedBackup(text)) throw new ApiError('This backup is password protected. Open it with Restore or Import so you can enter the password.');
   if (text.length > MAX_BACKUP_BYTES) throw new ApiError('That file is too large to be a TripNest backup.');
   let j: unknown;
   try { j = JSON.parse(text); } catch { throw new ApiError("That file isn't a TripNest backup (it couldn't be read)."); }

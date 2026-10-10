@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTrip } from '../../hooks/contexts';
 import { useAction } from '../../hooks/hooks';
-import { backupFileName, exportData } from '../../api/backup';
+import { backupFileName, exportData, makeBackupText } from '../../api/backup';
 import { expenseLike, icsItem, itemLike, nameOf, packingLike, settlementLike } from '../../api/adapters';
 import { buildIcs, REMINDER_CHOICES } from '../../lib/ics';
 import { groupByDay } from '../../lib/itinerary';
@@ -12,6 +12,7 @@ import { dayIndex, durationText, formatDateRange } from '../../lib/trip';
 import { formatDateLong } from '../../lib/time';
 import { ErrorBanner, download } from '../../components/ui';
 import { canShareFiles, shareOrDownload } from '../../components/share';
+import { ProtectOption, useProtectOption } from '../../components/BackupPassword';
 import ItemRow from '../../components/ItemRow';
 import { KIND_LABELS, ReservationCard } from './Reservations';
 
@@ -29,14 +30,15 @@ export default function Export() {
 
   const [withFiles, setWithFiles] = useState(true);
   const file = useAction();
+  const protect = useProtectOption();
   const saveTrip = async () => {
-    const f = await file.run(() => exportData({ tripId: trip.id, includeFiles: withFiles }));
-    if (f) download(backupFileName(trip.name), JSON.stringify(f), 'application/json');
+    const text = await file.run(async () => makeBackupText(await exportData({ tripId: trip.id, includeFiles: withFiles }), protect.password));
+    if (text) download(backupFileName(trip.name), text, 'application/json');
   };
 
   const shareTrip = async () => {
-    const f = await file.run(() => exportData({ tripId: trip.id, includeFiles: withFiles }));
-    if (f) await shareOrDownload(backupFileName(trip.name), JSON.stringify(f), 'application/json', `${trip.name} (TripNest trip)`);
+    const text = await file.run(async () => makeBackupText(await exportData({ tripId: trip.id, includeFiles: withFiles }), protect.password));
+    if (text) await shareOrDownload(backupFileName(trip.name), text, 'application/json', `${trip.name} (TripNest trip)`);
   };
 
   const [reminder, setReminder] = useState<number | null>(60);
@@ -62,8 +64,9 @@ export default function Export() {
         <p className="muted">Save the whole trip as a file, then open <strong>Import a trip file</strong> on the Trips page of the other phone. It arrives as an independent copy; nothing is shared afterwards.</p>
         <ErrorBanner message={file.error} />
         <label className="check"><input type="checkbox" checked={withFiles} onChange={(e) => setWithFiles(e.target.checked)} /> Include uploaded documents ({data.documents.length})</label>
-        <button className="btn" onClick={saveTrip} disabled={file.busy}>{file.busy ? 'Preparing…' : 'Save trip to a file'}</button>
-        {canShareFiles() && <button className="btn btn-primary" style={{ marginLeft: 8 }} onClick={shareTrip} disabled={file.busy}>Share trip…</button>}
+        <ProtectOption o={protect} />
+        <button className="btn" onClick={saveTrip} disabled={file.busy || (protect.on && !protect.password)}>{file.busy ? 'Preparing…' : 'Save trip to a file'}</button>
+        {canShareFiles() && <button className="btn btn-primary" style={{ marginLeft: 8 }} onClick={shareTrip} disabled={file.busy || (protect.on && !protect.password)}>Share trip…</button>}
       </section>
 
       <article aria-label="Printable trip booklet">

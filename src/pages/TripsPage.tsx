@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { friendly, trips as tripsApi } from '../api/api';
-import { importTrips, parseBackup } from '../api/backup';
+import { importTrips, openBackup } from '../api/backup';
+import { usePasswordPrompt } from '../components/BackupPassword';
 import type { Trip } from '../api/types';
 import { Alert, Empty, ErrorBanner, Spinner, StatusBadge } from '../components/ui';
 import { useAction } from '../hooks/hooks';
@@ -16,6 +17,7 @@ export default function TripsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imp = useAction();
+  const prompt = usePasswordPrompt();
 
   const refresh = () => tripsApi.list().then(setList).catch((e) => setError(friendly(e).message));
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function TripsPage() {
   const onFile = async (f: File | undefined) => {
     if (!f) return;
     setNotice(null);
-    const ids = await imp.run(async () => importTrips(parseBackup(await f.text())));
+    const ids = await imp.run(async () => { const file = await openBackup(await f.text(), prompt.ask); return file ? importTrips(file) : null; }); // null: the person cancelled the password box
     if (fileRef.current) fileRef.current.value = '';
     if (ids) { setNotice(`Added ${ids.length} ${ids.length === 1 ? 'trip' : 'trips'} from the file.`); await refresh(); }
   };
@@ -55,6 +57,7 @@ export default function TripsPage() {
       </div>
       {notice && <Alert kind="success">{notice}</Alert>}
       <BackupNudges trips={list} />
+      {prompt.dialog}
       <ErrorBanner message={imp.error} />
       {shown.length === 0 ? (
         <Empty title="No trips yet">Create your first trip, or import a trip file someone sent you.</Empty>

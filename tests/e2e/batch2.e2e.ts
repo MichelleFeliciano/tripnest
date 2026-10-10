@@ -84,3 +84,61 @@ test('the trip banner counts down, and Key info can be pinned, edited and cleare
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Key info' })).toContainText('Pin what you would want');
 });
+
+test('a password-protected backup hides the trip, refuses a wrong password, and restores with the right one', async ({ page }, info) => {
+  test.setTimeout(120_000);
+  await page.goto('/trips/new');
+  await page.getByLabel('Trip name *').fill('Hush Hush Trip');
+  await page.getByLabel('Start date *').fill('2027-06-12');
+  await page.getByLabel('End date *').fill('2027-06-14');
+  await page.getByLabel('Your name *').fill('Michelle');
+  await page.getByRole('button', { name: 'Create trip' }).click();
+  await expect(page.getByRole('heading', { name: 'Hush Hush Trip' })).toBeVisible();
+
+  await page.goto('/profile');
+  const download = page.getByRole('button', { name: 'Download a backup' });
+  await page.getByLabel('Protect with a password').check();
+  await expect(download).toBeDisabled(); // no password yet
+  await page.getByLabel('Password', { exact: true }).fill('short');
+  await page.getByLabel('Type it again').fill('short');
+  await expect(download).toBeDisabled(); // too short
+  await page.getByLabel('Password', { exact: true }).fill('correct horse');
+  await page.getByLabel('Type it again').fill('correct hors');
+  await expect(page.getByText('The two passwords do not match.')).toBeVisible();
+  await expect(download).toBeDisabled();
+  await page.getByLabel('Type it again').fill('correct horse');
+  await expect(download).toBeEnabled();
+
+  const [dl] = await Promise.all([page.waitForEvent('download'), download.click()]);
+  const file = info.outputPath('locked.json');
+  await dl.saveAs(file);
+  const raw = readFileSync(file, 'utf8');
+  expect(raw).not.toContain('Hush Hush Trip');
+  expect(JSON.parse(raw)).toMatchObject({ app: 'tripnest', encrypted: true });
+  await expect(page.getByText('locked with your password')).toBeVisible();
+
+  // erase everything, then restore from the locked file
+  await page.getByRole('button', { name: 'Erase all data on this device…' }).click();
+  await page.getByLabel('Type ERASE to confirm').fill('ERASE');
+  await page.getByRole('button', { name: 'Erase everything' }).click();
+  await expect(page.getByText('Everything on this device was erased.')).toBeVisible();
+
+  await page.locator('input[type=file]').first().setInputFiles(file);
+  const box = page.getByRole('dialog', { name: 'This file is password protected' });
+  await box.getByLabel('Password').fill('wrong password');
+  await box.getByRole('button', { name: 'Open' }).click();
+  await expect(box.getByText('That password did not open the file')).toBeVisible();
+  await box.getByLabel('Password').fill('correct horse');
+  await box.getByRole('button', { name: 'Open' }).click();
+  await page.getByRole('button', { name: 'Replace everything' }).click();
+  await expect(page.getByText('Backup restored.')).toBeVisible();
+  await page.goto('/trips');
+  await expect(page.getByRole('link', { name: 'Hush Hush Trip' })).toBeVisible();
+
+  // cancelling the password box imports nothing
+  await page.locator('input[type=file]').first().setInputFiles(file);
+  const box2 = page.getByRole('dialog', { name: 'This file is password protected' });
+  await box2.getByRole('button', { name: 'Cancel' }).click();
+  await expect(box2).toBeHidden();
+  await expect(page.getByRole('link', { name: 'Hush Hush Trip' })).toHaveCount(1);
+});
