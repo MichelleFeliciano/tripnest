@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { backupFileName, exportData } from '../api/backup';
-import { dismissHomeScreenTip, getDevice, markBackedUp, snoozeBackupReminder } from '../api/device';
+import { dismissHomeScreenTip, dismissInstallTip, getDevice, markBackedUp, snoozeBackupReminder } from '../api/device';
 import type { Trip } from '../api/types';
 import { useAction } from '../hooks/hooks';
+import { canInstall, onInstallChange, promptInstall } from '../lib/installPrompt';
 import { backupReminder, needsHomeScreenTip } from '../lib/reminders';
 import { shareOrDownload } from './share';
 import { useToast } from './Toast';
@@ -25,6 +26,8 @@ export default function BackupNudges({ trips }: { trips: Trip[] }) {
   const act = useAction();
   const toast = useToast();
   const device = getDevice();
+  useEffect(() => onInstallChange(() => rerender((n) => n + 1)), []);
+  const showInstall = canInstall() && !device.install_tip_dismissed && !standalone();
 
   const oldest = trips.reduce<string | null>((a, t) => (a === null || t.created_at < a ? t.created_at : a), null);
   const reminder = backupReminder({ lastBackupAt: device.last_backup_at, oldestTripAt: oldest, snoozedUntil: device.backup_snoozed_until, now: Date.now() });
@@ -37,6 +40,15 @@ export default function BackupNudges({ trips }: { trips: Trip[] }) {
 
   return (
     <>
+      {showInstall && (
+        <Alert kind="info">
+          <strong>Install TripNest.</strong> Add it to your home screen to open it like an app, even without a connection.
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="btn btn-sm btn-primary" onClick={() => void promptInstall()}>Install</button>
+            <button className="btn btn-sm" onClick={() => { dismissInstallTip(); rerender((n) => n + 1); }}>Not now</button>
+          </div>
+        </Alert>
+      )}
       {showTip && (
         <Alert kind="info">
           <strong>Keep your trips safe on iPhone.</strong> Safari can clear the data of websites you have not opened for about a week. Tap the Share button, then <strong>Add to Home Screen</strong>: trips opened from the Home Screen icon are not cleared that way.

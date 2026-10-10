@@ -28,3 +28,31 @@ test('the calendar file has reminders only for timed items, and none when switch
   await page.getByLabel('Reminders').selectOption({ label: 'No reminders' });
   expect(await save('none.ics')).not.toContain('VALARM');
 });
+
+test('the install prompt appears when the browser offers it, installs on tap, and Not now is remembered', async ({ page }) => {
+  await page.goto('/trips');
+  await expect(page.getByRole('heading', { name: 'Your trips' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Install' })).toHaveCount(0); // nothing offered yet
+  const offer = () => page.evaluate(() => {
+    const w = window as unknown as { __installed?: number };
+    const e = new Event('beforeinstallprompt', { cancelable: true }) as Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+    e.prompt = async () => { w.__installed = (w.__installed ?? 0) + 1; };
+    e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    window.dispatchEvent(e);
+    return e.defaultPrevented; // we take over from the browser's own bar
+  });
+  expect(await offer()).toBe(true);
+  await expect(page.getByText('Install TripNest.')).toBeVisible();
+  await page.getByRole('button', { name: 'Install', exact: true }).click();
+  expect(await page.evaluate(() => (window as unknown as { __installed?: number }).__installed)).toBe(1);
+  await expect(page.getByText('Install TripNest.')).toHaveCount(0); // an offer can only be used once
+
+  await offer();
+  await page.getByRole('button', { name: 'Not now' }).click();
+  await expect(page.getByText('Install TripNest.')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Your trips' })).toBeVisible();
+  await offer();
+  await page.waitForTimeout(300);
+  await expect(page.getByText('Install TripNest.')).toHaveCount(0); // stays dismissed
+});

@@ -5,6 +5,7 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import { routerBasename } from './lib/appUrl';
+import { initInstallPrompt } from './lib/installPrompt';
 import './styles.css';
 
 // A new version replaces old files on the server. If a screen's file is gone, reload once to pick up the new version.
@@ -19,6 +20,8 @@ window.addEventListener('vite:preloadError', (event) => {
   } catch { /* storage unavailable: fall through to the error page */ }
 });
 window.addEventListener('load', () => setTimeout(() => { try { sessionStorage.removeItem(RELOAD_FLAG); } catch { /* ignore */ } }, 5000));
+
+initInstallPrompt();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
