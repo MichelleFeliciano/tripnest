@@ -10,6 +10,7 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 | Production build | succeeds (app script 225 kB, 73 kB gzipped; map code loads only on the Map page) |
 | Browser tests on GitHub Actions (Chromium on Linux, one job per screen size, run 38022749001) | **198 passed**, 0 failed, 0 retried; 10 skipped (checks that only apply to some screen sizes) |
 | The same browser tests on the developer PC (Microsoft Edge) | pass; Edge and Chromium differ in places (see below), so both are used |
+| **Real-phone check** ([DEVICE_CHECKLIST.md](DEVICE_CHECKLIST.md)): install, layout, sharing, maps links, weather, calendar, protected backups, two-phone merge, key info and countdown | **Done by the app's owner on real phones, who reported that it worked.** This is the owner's report, not something the automated tests observed; phone models and software versions were not recorded, and no problems were reported |
 
 ## What is tested
 **Logic (unit):** trip dates and duration; time zones including the Chicagoâ†’Puerto Rico flight, daylight-saving gaps/ambiguity, half-hour zones; itinerary ordering and cross-zone conflicts; packing progress, templates, privacy of personal lists; budgets and thresholds; search; Explore query building, ranking and junk filtering; ICS output (structure, line folding, escaping, UTC instants, all-day events); money parsing (including `12,50`), every split method with property tests over thousands of totals, balances, settlement simplification, partial and over-payments, multiple currencies.
@@ -43,7 +44,7 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - Merge is tested at three levels: the rules in isolation (19 tests, including 400 random edit-and-delete histories on two phones that must end up identical), against a real database with two simulated phones (13 tests: first import, update both ways, deletions, undo, documents, collisions, older files), and in the browser with two separate browser profiles passing a file through the real screens.
 - Password protection: round trips (accents, emoji, 2 MB), wrong password, tampering, crafted files, Unicode-form differences, and the full lock, erase, restore flow in a browser.
 - Accessibility scan (light, dark, phone) of the new screens: key info dialog, password options, import preview, password prompt.
-- Still not verified: a real phone (see [DEVICE_CHECKLIST.md](DEVICE_CHECKLIST.md)).
+- Checked afterwards on real phones by the app's owner using [DEVICE_CHECKLIST.md](DEVICE_CHECKLIST.md): reported working, with no problems.
 
 **Housekeeping pass:** the repository was scanned for leftovers from the earlier hosted-database version (none in the code, docs or git history; only two ignore-file lines, now removed), for unused source files and unused dependencies (none), and for committed secrets (none). A LICENSE (MIT) and README screenshots were added; a small header artifact (a sliver of gradient beside the wave under the trip banner) found while taking the screenshots was fixed.
 
@@ -60,7 +61,7 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 
 **Stylesheet review (every rule read; unused classes found by script):**
 - **The map painted over the sticky top bar and the bottom tab bar** when scrolling past it (Leaflet's internal layers sit at z-index 400 to 1000). Fixed; guarded by a browser test that checks what is actually under the bar.
-- **On iPhones with a home indicator the bottom tab bar lost about half its height** (the safe-area padding was taken out of a fixed height instead of added to it). Fixed. Not verified on a real iPhone: browsers on a PC report no safe area, so this one rests on reading the CSS.
+- **On iPhones with a home indicator the bottom tab bar lost about half its height** (the safe-area padding was taken out of a fixed height instead of added to it). Fixed. A PC browser reports no safe area, so the automated tests could not check this one; it rests on reading the CSS and was part of the owner's real-phone check (reported working).
 - Landscape iPhones with a notch: content could sit under the notch; side safe-area padding added to the top bar, page and tab bar.
 - Buttons stayed lifted after a tap on phones (hover effects now only where a real hover exists).
 - Wrapped segmented buttons (Explore categories) were clipped by a pill-shaped border; long dialogs now use dynamic viewport height so a phone's address bar cannot hide the bottom.
@@ -94,9 +95,9 @@ Scope: the on-device version of TripNest (no backend, no accounts). Everything b
 - "1 nights" grammar.
 
 ## Not verified
-- **Real devices.** All browser tests use Chromium-family emulation (Edge locally, Chromium in CI). iPhone Safari and real Android phones have not been tried, nor touch gestures, notches, or the home-screen install flow itself.
+- **Real devices.** All automated browser tests use Chromium-family emulation (Edge locally, Chromium in CI). The app's owner then ran the real-phone checklist (touch, layout, install, sharing and more) and reported everything working, but the exact phone models and software versions were not recorded, and other phones and browsers were not tried.
 - **Screen readers** (VoiceOver/TalkBack/NVDA). Only the automated axe scan was run.
-- **Weather** (Open-Meteo) was tested against mocked replies shaped like Open-Meteo's documented format; the live service has not been called by the tests. **The share sheet** was tested with a stand-in, because desktop browsers have none: it has not been tried on a real iPhone or Android phone.
+- **Weather** (Open-Meteo) was tested against mocked replies shaped like Open-Meteo's documented format; the live service has not been called by the tests. **The share sheet** was tested with a stand-in, because desktop browsers have none: it was covered by the owner's real-phone check (reported working). Weather against the live service was also part of that check.
 - **Map tiles, "Find coordinates" and Explore** call free OpenStreetMap services; they were exercised against the live services earlier in development, but the automated tests block them for determinism.
 - **Print/PDF output** was not inspected visually.
 - **Storage eviction behaviour** differs by browser; the persistence request is best-effort and cannot be tested automatically.
