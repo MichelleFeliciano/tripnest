@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { trash, trips } from './api/api';
 import { requestPersistence } from './api/db';
 import { Alert, Spinner } from './components/ui';
@@ -26,15 +26,34 @@ const Export = lazy(() => import('./pages/trip/Export'));
 const Settings = lazy(() => import('./pages/trip/Settings'));
 const More = lazy(() => import('./pages/trip/More'));
 
+/** Where "Back" goes when there is no earlier page in this tab (a link opened directly): up one level. */
+export function parentPath(pathname: string): string {
+  const m = /^\/trips\/([^/]+)\/[^/]+/.exec(pathname);
+  return m && m[1] !== 'new' ? `/trips/${m[1]}` : '/trips';
+}
+
 function TopBar() {
+  const { pathname } = useLocation();
+  const nav = useNavigate();
+  const atRoot = pathname === '/trips' || pathname === '/trips/' || pathname === '/';
+  // React Router keeps the position in this tab's history in history.state.idx; 0 means nothing earlier to go back to.
+  const goBack = () => (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0 ? nav(-1) : nav(parentPath(pathname), { replace: true }));
   return (
     <header className="topbar">
+      {!atRoot && <button className="topbar-btn back-btn" onClick={goBack} aria-label="Back">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+        <span aria-hidden="true">Back</span>
+      </button>}
       <NavLink to="/trips" className="brand" aria-label="TripNest home"><span aria-hidden="true">🌴</span> TripNest</NavLink>
       <nav className="topnav" aria-label="Primary">
         <NavLink to="/trips" end>Trips</NavLink>
         <NavLink to="/trips/new">Create Trip</NavLink>
         <NavLink to="/profile">Profile</NavLink>
       </nav>
+      <NavLink to="/profile" className="topbar-btn profile-btn" aria-label="Profile and backups">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.2 3.6-7 8-7s8 2.8 8 7" /></svg>
+        <span aria-hidden="true">Profile</span>
+      </NavLink>
     </header>
   );
 }

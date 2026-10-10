@@ -61,3 +61,55 @@ test('Explore shows a short description under each place, and adds it to the iti
   await page.goto(`/trips/${tripId}/itinerary`);
   await expect(page.locator('main')).toContainText('Puerto Rican and seafood restaurant. Has outdoor seating.');
 });
+
+test('phone top bar: a Profile button everywhere, and a Back button that goes somewhere sensible', async ({ page }, info) => {
+  const phone = info.project.name.startsWith('phone');
+  const tripId = await seedSampleTrip(page);
+  const back = page.getByRole('button', { name: 'Back', exact: true });
+  const profile = page.getByRole('link', { name: 'Profile and backups' });
+
+  await page.goto('/trips');
+  await expect(page.getByRole('heading', { name: 'Your trips' })).toBeVisible();
+  await expect(back).toHaveCount(0); // nothing above the trips list
+  if (!phone) {
+    await expect(profile).toBeHidden(); // desktop keeps its text links
+    await expect(back).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Profile' })).toBeVisible();
+    return;
+  }
+  await expect(page.getByRole('navigation', { name: 'Primary' })).toBeHidden();
+  await expect(profile).toBeVisible();
+
+  // Trips -> Profile -> Back returns to Trips
+  await profile.click();
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(page).toHaveURL(/\/trips$/);
+
+  // Trips -> New trip -> Back
+  await page.getByRole('link', { name: '+ New trip' }).click();
+  await expect(page).toHaveURL(/\/trips\/new$/);
+  await back.click();
+  await expect(page).toHaveURL(/\/trips$/);
+
+  // Trip -> section -> Back is the browser's own back (one step), then Back again leaves the trip
+  await page.getByRole('link', { name: /Puerto Rico/ }).first().click();
+  await expect(page).toHaveURL(new RegExp(`/trips/${tripId}$`));
+  await page.goto(`/trips/${tripId}/expenses`, { waitUntil: 'domcontentloaded' });
+  await expect(back).toBeVisible();
+  // a page opened directly has no earlier page in this tab: Back goes up one level instead of leaving the app
+  await page.goto('about:blank');
+  await page.goto(`/trips/${tripId}/expenses`);
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(page).toHaveURL(new RegExp(`/trips/${tripId}$`));
+  await back.click();
+  await expect(page).toHaveURL(/\/trips$/);
+
+  // buttons are big enough to tap, and the bar does not overflow at the narrowest width
+  await page.goto('/profile');
+  const sizes = await page.evaluate(() => [...document.querySelectorAll('.topbar-btn')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
+  for (const [w, h] of sizes) { expect(w).toBeGreaterThanOrEqual(44); expect(h).toBeGreaterThanOrEqual(44); }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
