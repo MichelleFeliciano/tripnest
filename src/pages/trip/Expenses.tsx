@@ -163,7 +163,7 @@ export default function Expenses() {
 
       <section className="card" aria-labelledby="list-h">
         <h3 id="list-h">All expenses</h3>
-        {exps.length === 0 ? <Empty title="No expenses yet">Add the first shared cost and choose how to split it.</Empty> : (
+        {exps.length === 0 ? <Empty title="No expenses yet" action={{ label: 'Add one now', onClick: () => open('new') }}>Add the first shared cost and choose how to split it.</Empty> : (
           <div className="table-wrap">
             <table>
               <caption className="sr-only">Shared expenses</caption>

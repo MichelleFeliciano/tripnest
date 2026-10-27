@@ -57,7 +57,7 @@ test('keyboard focus stays on the Move button after an item moves', async ({ pag
   const button = page.getByRole('button', { name: label });
   await button.focus();
   await page.keyboard.press('Enter');
-  await expect.poll(() => page.locator('li.item strong').first().innerText()).toContain('Apple picking'); // it moved up one place
+  await expect.poll(() => page.locator('li.item strong').nth(1).innerText()).toContain('Zebra walk'); // it moved up one place (from third to second)
   expect(await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toBe(label); // and focus did not fall back to the page
   await page.keyboard.press('Enter'); // so a keyboard user can keep going
   await expect.poll(() => page.locator('li.item strong').first().innerText()).toContain('Zebra walk');
@@ -107,7 +107,7 @@ test('clearing a budget can be undone', async ({ page }) => {
   await page.getByRole('button', { name: 'Save budget' }).click();
   await expect(page.getByRole('heading', { name: 'Food', exact: true })).toHaveCount(0);
   await expect(page.getByText(/Deleted Budget/)).toBeVisible();
-  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.locator('.toast').getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByRole('heading', { name: 'Food', exact: true })).toBeVisible();
 });
 
@@ -118,6 +118,6 @@ test('removing a traveler can be undone', async ({ page }) => {
   await page.getByRole('button', { name: 'Remove Mom' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: 'Mom' })).toHaveCount(0);
   await expect(page.getByText(/Deleted Traveler/)).toBeVisible();
-  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.locator('.toast').getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: 'Mom' })).toHaveCount(1);
 });

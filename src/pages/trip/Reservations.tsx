@@ -129,7 +129,7 @@ export default function Reservations() {
   return (
     <div>
       <div className="row-between"><h2>Reservations</h2>{<button className="btn btn-primary" onClick={() => open('new')}>+ Add reservation</button>}</div>
-      {sorted.length === 0 ? <Empty title="No reservations yet">Add flights, hotels, restaurants and activities with their confirmation numbers.</Empty> : sorted.map((r) => <ReservationCard key={r.id} r={r} onEdit={open} />)}
+      {sorted.length === 0 ? <Empty title="No reservations yet" action={{ label: 'Add one now', onClick: () => open('new') }}>Add flights, hotels, restaurants and activities with their confirmation numbers.</Empty> : sorted.map((r) => <ReservationCard key={r.id} r={r} onEdit={open} />)}
 
       <Dialog open={editing !== null} onClose={close} title={editing === 'new' ? 'Add reservation' : 'Edit reservation'}>
         <form onSubmit={submit}>

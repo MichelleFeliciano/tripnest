@@ -25,8 +25,9 @@
   --font-display: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif;
   color-scheme: light dark;
 }
+/* Dark colours: automatic (follows the device) unless the person chose Light or Dark in Settings. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #07222e; --surface: #0d3140; --text: #e7f6f4; --muted: #9fc3ca; --border: #1d4c5c; --field-border: #5f8c99;
     --brand: #5eead4; --brand-2: #2dd4bf; --brand-ink: #04211d; --brand-soft: #12475a;
     --sun: #ffb347; --sun-soft: #3d3a2a; --coral: #ff8a66; --lagoon: #35cfe0;
@@ -36,6 +37,17 @@
     --shadow: none;
   }
 }
+:root[data-theme='dark'] {
+    --bg: #07222e; --surface: #0d3140; --text: #e7f6f4; --muted: #9fc3ca; --border: #1d4c5c; --field-border: #5f8c99;
+    --brand: #5eead4; --brand-2: #2dd4bf; --brand-ink: #04211d; --brand-soft: #12475a;
+    --sun: #ffb347; --sun-soft: #3d3a2a; --coral: #ff8a66; --lagoon: #35cfe0;
+    --hero: linear-gradient(120deg, #2c2a6b 0%, #6b2a6b 52%, #9a3a2a 100%);
+    --hero-text: #ffffff; --hero-muted: #f0e6ff;
+    --warn: #fcd34d; --warn-bg: #3b2a08; --danger: #fda29b; --danger-bg: #3a1411; --ok: #86efac; --ok-bg: #0f2e1b; --info-bg: #0b2a3b; --info: #7dd3fc;
+    --shadow: none;
+  color-scheme: dark;
+}
+:root[data-theme='light'] { color-scheme: light; }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 64px); } /* room for the top bar and a sticky day heading */
 @media (max-width: 719px) { html { scroll-padding-bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); } } /* and for the tab bar */
@@ -237,12 +249,42 @@ caption { text-align: left; font-weight: 700; padding: 0 0 8px; }
   .btn-primary { border-color: ButtonText; }
 }
 
+/* ── status banners (update, offline, storage) ── */
+.status-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem .75rem; padding: .6rem max(16px, env(safe-area-inset-left)); font-size: .95rem; border-bottom: 1px solid var(--border); }
+.status-info { background: var(--info-bg); color: var(--info); }
+.status-warn { background: var(--warn-bg); color: var(--warn); }
+.status-danger { background: var(--danger-bg); color: var(--danger); }
+.status-banner .btn { color: var(--text); }
+.status-banner .btn-primary { color: var(--brand-ink); }
+.lock-card .status-banner { border-radius: 10px; margin-bottom: .75rem; }
+
+/* ── app lock ── */
+.lock-screen { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 16px; background: var(--bg); }
+.lock-card { width: min(420px, 100%); }
+
+/* ── undo bar, history, help, settings check ── */
+.undo-bar { margin: 0 0 12px; }
+.history-list { padding-left: 1.5rem; }
+.history-list li { padding: .5rem 0; }
+.history-undone strong { text-decoration: line-through; opacity: .75; }
+.help-list details { border-bottom: 1px solid var(--border); padding: .5rem 0; }
+.help-list details:last-child { border-bottom: 0; }
+.help-list summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+fieldset.plain { border: 0; padding: 0; margin: 0 0 .75rem; min-width: 0; }
+fieldset.plain legend { font-weight: 700; padding: 0; margin-bottom: .25rem; }
+.checklist li { display: flex; gap: .75rem; align-items: flex-start; padding: .5rem 0; }
+.chk { flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .9rem; line-height: 1; }
+.chk-ok { background: var(--ok-bg); color: var(--ok); }
+.chk-warn { background: var(--warn-bg); color: var(--warn); }
+.chk-info { background: var(--info-bg); color: var(--info); }
+.welcome { border-color: var(--brand); }
+
 /* ── printable booklet ── */
 .print-only { display: none; }
 @media print {
   :root { --bg: #fff; --surface: #fff; --text: #000; --muted: #333; --border: #999; --hero: none; --hero-text: #000; --hero-muted: #333; }
   body { font-size: 11pt; background: #fff; }
-  .topbar, .tabs, .tabbar, .no-print, .btn, .skip { display: none !important; }
+  .topbar, .tabs, .tabbar, .no-print, .btn, .skip, .status-banner { display: none !important; }
   .print-only { display: block; }
   .container { max-width: none; padding: 0; }
   .hero { background: none; padding: 0; border-radius: 0; }

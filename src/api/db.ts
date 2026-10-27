@@ -1,3 +1,4 @@
+import { describeChange, sameContent } from '../lib/history';
 /**
  * On-device storage. All trip data lives in this browser's IndexedDB and never leaves the device.
  * Every table is an object store keyed by `id`; child tables are indexed by `trip_id`.
@@ -25,7 +26,21 @@ export interface TrashEntry {
   /** references that were cleared on other rows by the delete, so a restore can put them back */
   unlinks: { table: Table; id: string; field: string; value: string }[];
 }
-export type StoreName = Table | 'blobs' | 'trash';
+/** One recorded change to a row, kept so it can be undone and redone. `before` is null for a new row, `after` is null for a removed one. */
+export interface HistoryChange { table: Table; id: string; before: Row | null; after: Row | null }
+/** A step in the History list: everything one action changed, saved together. */
+export interface HistoryEntry {
+  id: string;
+  at: string;
+  label: string;
+  trip_id: string | null;
+  state: 'done' | 'undone';
+  /** False for deletes, imports and restores of backups: they have their own way back (Recently deleted, a backup). */
+  undoable: boolean;
+  changes: HistoryChange[];
+}
+export const HISTORY_LIMIT = 100;
+export type StoreName = Table | 'blobs' | 'trash' | 'history';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Row = Record<string, any> & { id: string };
 
@@ -36,7 +51,7 @@ export class StorageUnavailableError extends Error {
 }
 
 const DB_NAME = 'tripnest';
-const DB_VERSION = 2; // v2 adds the "tasks" and "trash" stores
+const DB_VERSION = 3; // v2 adds the "tasks" and "trash" stores; v3 adds "history"
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 /** Forget the open connection (tests, and after a full wipe). */
@@ -62,6 +77,7 @@ function open(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains('blobs')) db.createObjectStore('blobs', { keyPath: 'id' }); // uploaded documents
       if (!db.objectStoreNames.contains('trash')) db.createObjectStore('trash', { keyPath: 'id' }); // recently deleted
+      if (!db.objectStoreNames.contains('history')) db.createObjectStore('history', { keyPath: 'id' }); // undo / redo
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -86,7 +102,10 @@ export interface Tx {
   /** Saves a row exactly as given, keeping its own `updated_at` (restoring a backup, importing, merging). */
   putAsIs(t: Table, row: Row): Promise<void>;
   del(t: Table, id: string): Promise<void>;
-  clear(t: Table | 'blobs' | 'trash'): Promise<void>;
+  clear(t: Table | 'blobs' | 'trash' | 'history'): Promise<void>;
+  historyAll(): Promise<HistoryEntry[]>;
+  historyPut(entry: HistoryEntry): Promise<void>;
+  historyDel(id: string): Promise<void>;
   blobPut(id: string, blob: Blob): Promise<void>;
   blobGet(id: string): Promise<Blob | undefined>;
   blobDel(id: string): Promise<void>;
@@ -97,18 +116,28 @@ export interface Tx {
   trashDel(id: string): Promise<void>;
 }
 
-/** Run `fn` inside a single transaction over `stores`. Throwing inside `fn` rolls everything back. */
-export async function transaction<T>(stores: StoreName[], mode: IDBTransactionMode, fn: (x: Tx) => Promise<T>): Promise<T> {
+/**
+ * Run `fn` inside a single transaction over `stores`. Throwing inside `fn` rolls everything back.
+ * Writes to the data tables are also recorded in the History list (same transaction, so the two never disagree).
+ * Pass `{ journal: false }` for work that must not appear there (undo itself, wiping the device).
+ */
+export async function transaction<T>(stores: StoreName[], mode: IDBTransactionMode, fn: (x: Tx) => Promise<T>, opts: { journal?: boolean } = {}): Promise<T> {
   const db = await open();
+  const journal = mode === 'readwrite' && opts.journal !== false && stores.some((s) => (TABLES as readonly string[]).includes(s));
+  const names = journal && !stores.includes('history') ? [...stores, 'history' as StoreName] : stores;
   return new Promise<T>((resolve, reject) => {
     let t: IDBTransaction;
-    try { t = db.transaction(stores, mode); } catch (e) { return reject(e); }
+    try { t = db.transaction(names, mode); } catch (e) { return reject(e); }
     let result: T;
-    let failed = false;
-    t.oncomplete = () => resolve(result);
-    t.onabort = () => reject(t.error ?? new Error('Storage transaction was cancelled'));
+    let rec: Recorder | null = null;
+    t.oncomplete = () => { if (rec?.wrote) globalThis.dispatchEvent?.(new Event(HISTORY_EVENT)); resolve(result); };
+    t.onabort = () => {
+      const err = t.error ?? new Error('Storage transaction was cancelled');
+      if ((err as { name?: string }).name === 'QuotaExceededError') globalThis.dispatchEvent?.(new Event(STORAGE_FULL_EVENT));
+      reject(err);
+    };
     t.onerror = () => { /* surfaced through onabort */ };
-    const x: Tx = {
+    const raw: Tx = {
       all: (s) => req(t.objectStore(s).getAll()) as Promise<Row[]>,
       byTrip: (s, id) => req(t.objectStore(s).index('trip_id').getAll(id)) as Promise<Row[]>,
       get: (s, id) => req(t.objectStore(s).get(id)) as Promise<Row | undefined>,
@@ -124,14 +153,68 @@ export async function transaction<T>(stores: StoreName[], mode: IDBTransactionMo
       trashGet: (id) => req(t.objectStore('trash').get(id)) as Promise<TrashEntry | undefined>,
       trashPut: async (entry) => { await req(t.objectStore('trash').put(entry)); },
       trashDel: async (id) => { await req(t.objectStore('trash').delete(id)); },
+      historyAll: () => req(t.objectStore('history').getAll()) as Promise<HistoryEntry[]>,
+      historyPut: async (entry) => { await req(t.objectStore('history').put(entry)); },
+      historyDel: async (id) => { await req(t.objectStore('history').delete(id)); },
     };
-    fn(x).then((r) => { result = r; }).catch((e) => {
-      failed = true;
+    rec = journal ? new Recorder(raw) : null;
+    const x = rec ? rec.tx : raw;
+    fn(x).then(async (r) => { if (rec) await rec.flush(); result = r; }).catch((e) => {
       try { t.abort(); } catch { /* already finished */ }
       reject(e);
     });
-    void failed;
   });
+}
+
+/** Fired after a change was added to the History list, so Undo / Redo buttons can refresh. */
+export const HISTORY_EVENT = 'tripnest:history-changed';
+/** Fired when the browser refuses a save because the device is out of space. */
+export const STORAGE_FULL_EVENT = 'tripnest:storage-full';
+
+let seq = 0;
+const newHistoryId = () => `${Date.now().toString().padStart(14, '0')}-${String(++seq % 1000).padStart(3, '0')}`;
+
+/** Wraps a transaction's writes so the History list can describe and reverse them. */
+class Recorder {
+  private changes = new Map<string, HistoryChange>();
+  private barrier: string | null = null;
+  private restored: string | null = null;
+  readonly tx: Tx;
+  wrote = false;
+  constructor(private raw: Tx) {
+    this.tx = {
+      ...raw,
+      put: async (t, row) => {
+        const before = (await raw.get(t, row.id)) ?? null;
+        const after = { ...row, updated_at: new Date().toISOString() };
+        await raw.putAsIs(t, after);
+        const key = `${t}/${row.id}`;
+        const prior = this.changes.get(key);
+        this.changes.set(key, { table: t, id: row.id, before: prior ? prior.before : before, after });
+      },
+      putAsIs: async (t, row) => { this.barrier ??= 'Imported or merged data'; await raw.putAsIs(t, row); },
+      del: async (t, id) => { this.barrier ??= 'Removed data'; await raw.del(t, id); },
+      clear: async (s) => { if (s !== 'trash' && s !== 'blobs' && s !== 'history') this.barrier ??= 'Replaced all data'; await raw.clear(s); },
+      trashPut: async (e) => { this.barrier = `Deleted ${e.kind} “${e.label}”`; await raw.trashPut(e); },
+      trashDel: async (id) => { const e = await raw.trashGet(id); if (e) this.restored = `Restored ${e.kind} “${e.label}”`; await raw.trashDel(id); },
+    };
+  }
+
+  async flush(): Promise<void> {
+    const real = [...this.changes.values()].filter((c) => !sameContent(c.before, c.after));
+    if (real.length === 0 && !this.barrier) return;
+    const all = await this.raw.historyAll();
+    for (const e of all) if (e.state === 'undone') await this.raw.historyDel(e.id); // a new action ends the Redo chain
+    const keep = all.filter((e) => e.state === 'done').sort((a, b) => (a.id < b.id ? -1 : 1));
+    if (this.barrier) for (const e of keep) if (e.undoable) await this.raw.historyPut({ ...e, undoable: false, changes: [] });
+    const primary = real.find((c) => c.table === 'trips') ?? real[0];
+    const label = this.barrier ?? this.restored ?? describeChange(primary.table, primary.before, primary.after, real.length - 1);
+    const tripId = primary ? (primary.table === 'trips' ? primary.id : String((primary.after ?? primary.before)?.trip_id ?? '') || null) : null;
+    this.wrote = true;
+    await this.raw.historyPut({ id: newHistoryId(), at: new Date().toISOString(), label, trip_id: tripId, state: 'done', undoable: !this.barrier, changes: this.barrier ? [] : real });
+    const total = keep.length + 1;
+    for (const e of keep.slice(0, Math.max(0, total - HISTORY_LIMIT))) await this.raw.historyDel(e.id);
+  }
 }
 
 /** Ask the browser not to evict our data under storage pressure (best effort, silent). */

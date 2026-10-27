@@ -11,6 +11,7 @@ import { useAction } from '../hooks/hooks';
 import { DATA_CHANGED } from '../components/Toast';
 import BackupNudges from '../components/BackupNudges';
 import { formatDateRange, tripDuration } from '../lib/trip';
+import { dismissWelcome, getDevice } from '../api/device';
 
 function importMessage(r: ImportResult): string {
   const parts: string[] = [];
@@ -35,6 +36,7 @@ export default function TripsPage() {
 
   const [pending, setPending] = useState<{ file: BackupFile; plan: PlannedTrip[] } | null>(null);
   const finish = useAction();
+  const [welcome, setWelcome] = useState(!getDevice().welcome_dismissed);
 
   const refresh = () => tripsApi.list().then(setList).catch((e) => setError(friendly(e).message));
   useEffect(() => {
@@ -83,15 +85,31 @@ export default function TripsPage() {
             Import a trip file
             <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
           </label>
+          <Link className="btn" to="/search"><span aria-hidden="true">🔍 </span>Search all</Link>
         </div>
       </div>
+      {welcome && list.length === 0 && (
+        <section className="card welcome" aria-labelledby="wel-h">
+          <h2 id="wel-h">Welcome to TripNest 🌴</h2>
+          <ul>
+            <li>Plan trips, split costs, pack and keep every booking in one place.</li>
+            <li>Everything stays on <strong>this device</strong>. There are no accounts.</li>
+            <li>Make a backup now and then (Profile), and it works offline too.</li>
+          </ul>
+          <div className="row">
+            <Link className="btn btn-primary" to="/trips/new" onClick={() => { dismissWelcome(); setWelcome(false); }}>Create my first trip</Link>
+            <Link className="btn" to="/help">How it works</Link>
+            <button className="btn btn-ghost" onClick={() => { dismissWelcome(); setWelcome(false); }}>Hide this</button>
+          </div>
+        </section>
+      )}
       {notice && <Alert kind="success">{notice}</Alert>}
       <BackupNudges trips={list} />
       {prompt.dialog}
       <ImportDialog pending={pending} busy={finish.busy} error={finish.error} onChoose={(mode) => pending && void apply(pending.file, mode)} onCancel={() => setPending(null)} />
       <ErrorBanner message={imp.error} />
       {shown.length === 0 ? (
-        <Empty title="No trips yet">Create your first trip, or import a trip file someone sent you.</Empty>
+        <Empty title="No trips yet" action={{ label: 'Add one now', to: '/trips/new' }}>Create your first trip, or import a trip file someone sent you.</Empty>
       ) : (
         <ul className="list grid grid-2" style={{ gap: 16 }}>
           {shown.map((t) => {

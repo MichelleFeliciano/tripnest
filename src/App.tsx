@@ -3,10 +3,20 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'reac
 import { trash, trips } from './api/api';
 import { requestPersistence } from './api/db';
 import { Alert, Spinner } from './components/ui';
+import { getLock, isLockOn, shouldRelock } from './api/lock';
+import { LOCK_NOW_EVENT } from './lib/events';
+import LockScreen from './components/LockScreen';
+import WhatsNewOnUpdate from './components/WhatsNew';
+import { OfflineBanner, StorageBanner, UpdateBanner } from './components/StatusBanners';
 import TripsPage from './pages/TripsPage';
 import NewTripPage from './pages/NewTripPage';
 import ProfilePage from './pages/ProfilePage';
 import TripLayout from './pages/TripLayout';
+
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const HelpPage = lazy(() => import('./pages/HelpPage'));
+const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const GlobalSearchPage = lazy(() => import('./pages/GlobalSearchPage'));
 
 const Overview = lazy(() => import('./pages/trip/Overview'));
 const Itinerary = lazy(() => import('./pages/trip/Itinerary'));
@@ -48,6 +58,9 @@ function TopBar() {
       <nav className="topnav" aria-label="Primary">
         <NavLink to="/trips" end>Trips</NavLink>
         <NavLink to="/trips/new">Create Trip</NavLink>
+        <NavLink to="/search">Search</NavLink>
+        <NavLink to="/settings">Settings</NavLink>
+        <NavLink to="/help">Help</NavLink>
         <NavLink to="/profile">Profile</NavLink>
       </nav>
       <NavLink to="/profile" className="topbar-btn profile-btn" aria-label="Profile and backups">
@@ -89,8 +102,28 @@ function useScrollableTablesFocusable() {
   }, []);
 }
 
+/** True while the app lock is showing. Locks again after the app has been in the background long enough, or on "Lock now". */
+function useAppLock() {
+  const [locked, setLocked] = useState(isLockOn());
+  useEffect(() => {
+    let hiddenAt: number | null = null;
+    const vis = () => {
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      const cfg = getLock();
+      if (cfg && hiddenAt !== null && shouldRelock(hiddenAt, Date.now(), cfg.autoLockMinutes)) setLocked(true);
+      hiddenAt = null;
+    };
+    const now = () => { if (isLockOn()) setLocked(true); };
+    document.addEventListener('visibilitychange', vis);
+    window.addEventListener(LOCK_NOW_EVENT, now);
+    return () => { document.removeEventListener('visibilitychange', vis); window.removeEventListener(LOCK_NOW_EVENT, now); };
+  }, []);
+  return { locked, unlock: () => setLocked(false) };
+}
+
 export default function App() {
   useScrollableTablesFocusable();
+  const lock = useAppLock();
   const [storageProblem, setStorageProblem] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,10 +132,16 @@ export default function App() {
     void trash.purgeOld(); // drop anything deleted more than 30 days ago
   }, []);
 
+  if (lock.locked) return <LockScreen onUnlocked={lock.unlock} />;
+
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
       <TopBar />
+      <UpdateBanner />
+      <OfflineBanner />
+      <StorageBanner />
+      <WhatsNewOnUpdate />
       {storageProblem && <div className="container" style={{ paddingBottom: 0 }}><Alert kind="error">{storageProblem}</Alert></div>}
       <div id="main">
         <Suspense fallback={<Spinner />}>
@@ -112,6 +151,10 @@ export default function App() {
             <Route path="/trips" element={<TripsPage />} />
             <Route path="/trips/new" element={<NewTripPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/help" element={<HelpPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/search" element={<GlobalSearchPage />} />
             <Route path="/trips/:tripId" element={<TripLayout />}>
               <Route index element={<Overview />} />
               <Route path="itinerary" element={<Itinerary />} />

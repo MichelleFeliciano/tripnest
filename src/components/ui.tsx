@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { STATUS_LABELS, type TripStatus } from '../lib/trip';
 import type { BudgetStatus } from '../lib/budget';
 
@@ -29,8 +30,13 @@ export function Spinner({ label = 'Loading…' }: { label?: string }) {
   return <div className="spinner" role="status" aria-live="polite"><span className="dot" aria-hidden="true" />{label}</div>;
 }
 
-export function Empty({ title, children }: { title: string; children?: ReactNode }) {
-  return <div className="empty"><strong>{title}</strong>{children && <p className="muted">{children}</p>}</div>;
+/** An empty screen. `action` adds the "Add one now" button: a link (`to`) or a click handler. */
+export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: { label: string; to?: string; onClick?: () => void } }) {
+  return (
+    <div className="empty"><strong>{title}</strong>{children && <p className="muted">{children}</p>}
+      {action && (action.to ? <Link className="btn btn-primary" to={action.to}>{action.label}</Link> : <button type="button" className="btn btn-primary" onClick={action.onClick}>{action.label}</button>)}
+    </div>
+  );
 }
 
 /** Accessible modal on the native <dialog> element (focus trap + Esc come for free). */

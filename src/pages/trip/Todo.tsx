@@ -64,7 +64,7 @@ export default function Todo() {
         </section>
       )}
 
-      {data.tasks.length === 0 ? <Empty title="Nothing on the list yet" /> : (
+      {data.tasks.length === 0 ? <Empty title="Nothing on the list yet" action={{ label: 'Add one now', onClick: () => document.querySelector<HTMLInputElement>('main form input')?.focus() }} /> : (
         <>
           <p><strong>{progress.done} / {progress.total}</strong> done</p>
           <ProgressBar value={progress.percent} label="To-do progress" />

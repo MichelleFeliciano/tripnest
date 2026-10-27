@@ -48,7 +48,7 @@ test('deleting an expense offers Undo, and the expense comes back unchanged', as
   await expect(page.locator('main')).not.toContainText('$90.01');
   await expect(page.getByRole('status').filter({ hasText: 'Deleted Expense' })).toContainText('Cabin ($90.01)');
 
-  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.locator('.toast').getByRole('button', { name: 'Undo' }).click();
   await expect(page.locator('main')).toContainText('$90.01');
   await expect(page.getByRole('status').filter({ hasText: 'Restored' })).toBeVisible();
 });
@@ -60,7 +60,7 @@ test('a deleted trip and a deleted document can be restored from Profile, files 
   page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'Delete hotel-confirmation.pdf' }).click();
   await expect(page.locator('main')).not.toContainText('hotel-confirmation.pdf');
-  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.locator('.toast').getByRole('button', { name: 'Undo' }).click();
   await expect(page.locator('main')).toContainText('hotel-confirmation.pdf');
   await clickAndExpectFileOpened(page, () => page.getByRole('button', { name: 'Open hotel-confirmation.pdf' }).click()); // the file itself came back
 

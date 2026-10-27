@@ -75,7 +75,7 @@ export default function Documents() {
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save to this device'}</button>
       </form>
       <ErrorBanner message={open.error} />
-      {data.documents.length === 0 ? <Empty title="No documents yet">Hotel confirmations, flight itineraries, rental agreements and tickets can live here.</Empty> : (
+      {data.documents.length === 0 ? <Empty title="No documents yet" action={{ label: 'Add one now', onClick: () => document.querySelector<HTMLElement>('main form input')?.focus() }}>Hotel confirmations, flight itineraries, rental agreements and tickets can live here.</Empty> : (
         <ul className="list card">
           {data.documents.map((d) => (
             <li key={d.id} className="row-between">

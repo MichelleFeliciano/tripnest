@@ -5,6 +5,8 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { Plugin } from 'vite';
 
+const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+
 /**
  * Writes dist/sw.js after a production build: a tiny service worker that caches every built file so the
  * app opens with no connection. Same-origin files are served from the cache (updated on each deploy);
@@ -24,15 +26,17 @@ function offlineServiceWorker(): Plugin {
       const hash = createHash('sha256');
       for (const f of files) hash.update(f).update(readFileSync(join(outDir, f))); // content, not size: a same-length change must still make a new version
       const version = hash.digest('hex').slice(0, 12);
-      writeFileSync(join(outDir, 'sw.js'), `// generated at build time\nconst CACHE = 'tripnest-${version}';\nconst FILES = ${JSON.stringify(urls)};\n${SW_BODY}`);
+      writeFileSync(join(outDir, 'sw.js'), `// generated at build time\nconst CACHE = 'tripnest-v${pkg.version}-${version}';\nconst FILES = ${JSON.stringify(urls)};\n${SW_BODY}`);
     },
   };
 }
 
 const SW_BODY = `
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // No automatic skipWaiting: a new version waits until the person taps "Update now" (or closes every TripNest window).
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)));
 });
+self.addEventListener('message', (event) => { if (event.data === 'SKIP_WAITING') self.skipWaiting(); });
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
@@ -65,6 +69,8 @@ export default defineConfig({
   // '/' locally and on a custom domain; '/tripnest/' on GitHub Pages (set by the deploy workflow).
   base: process.env.VITE_BASE || '/',
   plugins: [react(), offlineServiceWorker()],
+  // Shown in Settings; the service worker cache is named tripnest-v<version>-<files hash> so the two always agree.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version), __BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)) },
   // Test output is written (and sometimes locked by OneDrive/antivirus) while the dev server runs; never watch it.
   server: { watch: { ignored: ['**/tests/e2e/.artifacts/**', '**/test-results/**', '**/playwright-report/**'] } },
   test: { include: ['tests/**/*.test.ts'], testTimeout: 30000 },

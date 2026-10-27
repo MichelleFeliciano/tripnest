@@ -25,7 +25,7 @@ export default function Details() {
         </section>
       )}
 
-      {data.reservations.length === 0 && <Empty title="No travel details yet">Add your flights, hotel, rental car and emergency contacts as reservations (use “Other / info” for contacts and check-in instructions).</Empty>}
+      {data.reservations.length === 0 && <Empty title="No travel details yet" action={{ label: 'Add one now', to: `/trips/${data.trip.id}/reservations?new=1` }}>Add your flights, hotel, rental car and emergency contacts as reservations (use “Other / info” for contacts and check-in instructions).</Empty>}
       {KIND_ORDER.map((k) => {
         const list = data.reservations.filter((r) => r.kind === k);
         if (!list.length) return null;

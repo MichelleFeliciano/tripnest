@@ -79,7 +79,7 @@ export default function Itinerary() {
       </div>
 
       {conflicts.length > 0 && <Alert kind="warn">{conflicts.length} possible schedule {conflicts.length === 1 ? 'overlap' : 'overlaps'} found. They're highlighted below. Nothing was changed.</Alert>}
-      {data.items.length === 0 && <Empty title="Your itinerary is empty">{'Add a flight, hotel check-in or dinner to get started.'}</Empty>}
+      {data.items.length === 0 && <Empty title="Your itinerary is empty" action={{ label: 'Add one now', onClick: openNew }}>{'Add a flight, hotel check-in or dinner to get started.'}</Empty>}
 
       {view === 'timeline' && data.items.length > 0 && dates.map((d) => renderDay(d))}
       {view === 'timeline' && outside.map((d) => renderDay(d))}

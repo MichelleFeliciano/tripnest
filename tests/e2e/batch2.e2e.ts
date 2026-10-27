@@ -60,7 +60,7 @@ test('the install prompt appears when the browser offers it, installs on tap, an
 
 test('the trip banner counts down, and Key info can be pinned, edited and cleared', async ({ page }) => {
   const DAY = 86_400_000;
-  const iso = (n: number) => new Date(Date.now() + n * DAY).toISOString().slice(0, 10);
+  const iso = (n: number) => new Date(Date.now() + n * DAY).toLocaleDateString('en-CA'); // the person's own calendar day, not UTC's
   await page.goto('/trips/new');
   await page.getByLabel('Trip name *').fill('Soon Trip');
   await page.getByLabel('Start date *').fill(iso(5));

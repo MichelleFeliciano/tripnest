@@ -13,15 +13,18 @@ export interface DeviceState {
   /** Weather sends a destination's coordinates to Open-Meteo, so it is off until the person turns it on. */
   weather_on: boolean;
   temp_unit: TempUnit | null;
+  /** The last version whose "What's new" this device has seen. */
+  seen_version: string | null;
+  welcome_dismissed: boolean;
 }
 const KEY = 'tripnest:device';
-const EMPTY: DeviceState = { last_backup_at: null, backup_snoozed_until: null, home_screen_tip_dismissed: false, install_tip_dismissed: false, weather_on: false, temp_unit: null };
+const EMPTY: DeviceState = { last_backup_at: null, backup_snoozed_until: null, home_screen_tip_dismissed: false, install_tip_dismissed: false, weather_on: false, temp_unit: null, seen_version: null, welcome_dismissed: false };
 
 export function getDevice(): DeviceState {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<DeviceState>;
     const date = (v: unknown) => (typeof v === 'string' && Number.isFinite(Date.parse(v)) ? v : null);
-    return { last_backup_at: date(s.last_backup_at), backup_snoozed_until: date(s.backup_snoozed_until), home_screen_tip_dismissed: s.home_screen_tip_dismissed === true, install_tip_dismissed: s.install_tip_dismissed === true, weather_on: s.weather_on === true, temp_unit: s.temp_unit === 'F' || s.temp_unit === 'C' ? s.temp_unit : null };
+    return { last_backup_at: date(s.last_backup_at), backup_snoozed_until: date(s.backup_snoozed_until), home_screen_tip_dismissed: s.home_screen_tip_dismissed === true, install_tip_dismissed: s.install_tip_dismissed === true, weather_on: s.weather_on === true, temp_unit: s.temp_unit === 'F' || s.temp_unit === 'C' ? s.temp_unit : null, seen_version: typeof s.seen_version === 'string' ? s.seen_version : null, welcome_dismissed: s.welcome_dismissed === true };
   } catch { return { ...EMPTY }; }
 }
 function save(patch: Partial<DeviceState>) {
@@ -33,3 +36,5 @@ export const setWeatherOn = (on: boolean) => save({ weather_on: on });
 export const setTempUnit = (u: TempUnit) => save({ temp_unit: u });
 export const dismissInstallTip = () => save({ install_tip_dismissed: true });
 export const dismissHomeScreenTip = () => save({ home_screen_tip_dismissed: true });
+export const markVersionSeen = (v: string) => save({ seen_version: v });
+export const dismissWelcome = () => save({ welcome_dismissed: true });

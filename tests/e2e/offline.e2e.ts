@@ -3,6 +3,8 @@
  * Proves the app opens, shows saved trips and accepts changes with no connection at all.
  */
 import { test, expect } from '@playwright/test';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 test('after one visit the app works fully offline', async ({ page, context }) => {
   await page.goto('/trips/new');
@@ -51,5 +53,32 @@ test('the app is installable: manifest and icons are reachable and valid', async
     const r = await request.get(new URL(icon.src, new URL(href!, page.url())).toString());
     expect(r.ok(), icon.src).toBe(true);
     expect(r.headers()['content-type']).toContain('image/png');
+  }
+});
+
+test('Settings shows a version that matches the saved copy, and an update is offered, then installed, on request', async ({ page }) => {
+  await page.goto('/settings');
+  await expect.poll(async () => page.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 20_000 }).toBe(true);
+  await page.reload();
+  const version = await page.getByTestId('app-version').innerText();
+  await expect(page.getByTestId('cache-name')).toHaveText(new RegExp(`^tripnest-v${version.replace(/\./g, '\.')}-[0-9a-f]+$`));
+  await expect(page.getByText('A new version of TripNest is ready.')).toHaveCount(0);
+
+  // pretend the server now has a newer service worker: same files, a different cache name (the preview server reads dist/ on every request)
+  const swPath = join(process.cwd(), 'dist', 'sw.js');
+  const original = readFileSync(swPath, 'utf8');
+  writeFileSync(swPath, original.replace(/const CACHE = '([^']+)'/, "const CACHE = '$1-next'"));
+  try {
+  await page.getByRole('button', { name: 'Check for updates' }).click();
+  await expect(page.getByText('A new version of TripNest is ready.')).toBeVisible({ timeout: 20_000 });
+  // nothing changed under our feet yet
+  expect(await page.evaluate(async () => (await caches.keys()).some((k) => k.endsWith('-next')))).toBe(true);
+  expect(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL.length)).toBeGreaterThan(0);
+
+  await page.getByRole('button', { name: 'Update now' }).first().click();
+  await expect(page.getByText('A new version of TripNest is ready.')).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByTestId('cache-name')).toHaveText(/-next$/, { timeout: 20_000 });
+  } finally {
+    writeFileSync(swPath, original);
   }
 });

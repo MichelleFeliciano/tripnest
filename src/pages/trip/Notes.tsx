@@ -63,7 +63,7 @@ export default function Notes() {
         <select id="nf" style={{ width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value as NoteScope | 'all')}><option value="all">All notes</option>{SCOPES.map(([s, l]) => <option key={s} value={s}>{l}</option>)}</select>
       </div>
       {data.trip.notes && filter !== 'destination' && filter !== 'itinerary' && filter !== 'reservation' && <div className="card"><div className="muted">Trip description notes</div><p style={{ whiteSpace: 'pre-wrap' }}>{data.trip.notes}</p></div>}
-      {list.length === 0 ? <Empty title="No notes yet" /> : list.map((n) => (
+      {list.length === 0 ? <Empty title="No notes yet" action={{ label: 'Add one now', onClick: () => document.querySelector<HTMLElement>('main form textarea, main form input')?.focus() }} /> : list.map((n) => (
         <div key={n.id} className="card">
           <div className="row-between"><strong>{label(n)}</strong><button className="btn btn-sm btn-ghost" onClick={() => del(n)} aria-label="Delete note">Delete</button></div>
           <p style={{ whiteSpace: 'pre-wrap' }}>{n.body}</p>

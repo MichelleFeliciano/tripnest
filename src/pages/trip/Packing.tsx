@@ -96,7 +96,7 @@ export default function Packing() {
       </div>
       <ErrorBanner message={error ?? toggleAction.error} />
 
-      {cats.length === 0 && items.length === 0 && <Empty title="Nothing to pack yet">{'Add items, or start from a template like Beach Vacation or Road Trip.'}</Empty>}
+      {cats.length === 0 && items.length === 0 && <Empty title="Nothing to pack yet" action={{ label: 'Add one now', onClick: () => setAdding(true) }}>{'Add items, or start from a template like Beach Vacation or Road Trip.'}</Empty>}
       {cats.map((c) => {
         const list = items.filter((i) => i.category_id === c.id);
         const p = packingProgress(list);

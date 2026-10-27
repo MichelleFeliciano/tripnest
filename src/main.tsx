@@ -6,6 +6,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import { routerBasename } from './lib/appUrl';
 import { initInstallPrompt } from './lib/installPrompt';
+import { applyPrefs } from './api/prefs';
+import { registerUpdates } from './api/updates';
 import './styles.css';
 
 // A new version replaces old files on the server. If a screen's file is gone, reload once to pick up the new version.
@@ -21,6 +23,7 @@ window.addEventListener('vite:preloadError', (event) => {
 });
 window.addEventListener('load', () => setTimeout(() => { try { sessionStorage.removeItem(RELOAD_FLAG); } catch { /* ignore */ } }, 5000));
 
+applyPrefs();
 initInstallPrompt();
 
 createRoot(document.getElementById('root')!).render(
@@ -35,9 +38,6 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Offline support: after the first visit the whole app is cached, so it opens without a connection.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
-  });
-}
+// Offline support and updates: after the first visit the whole app is cached, so it opens without a connection.
+// A newer version is downloaded in the background and offered through the "Update now" banner.
+registerUpdates();

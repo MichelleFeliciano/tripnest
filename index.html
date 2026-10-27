@@ -13,6 +13,15 @@
     <meta name="apple-mobile-web-app-title" content="TripNest" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>TripNest</title>
+    <script>
+      /* Apply the saved theme and text size before anything is drawn, so there is no flash. (Same rules as src/api/prefs.ts.) */
+      try {
+        var p = JSON.parse(localStorage.getItem('tripnest:prefs') || '{}');
+        if (p.theme === 'light' || p.theme === 'dark') document.documentElement.setAttribute('data-theme', p.theme);
+        var pct = { small: 90, large: 115, xlarge: 130 }[p.textSize];
+        if (pct) document.documentElement.style.fontSize = pct + '%';
+      } catch (e) { /* storage unavailable: defaults */ }
+    </script>
   </head>
   <body>
     <div id="root"></div>

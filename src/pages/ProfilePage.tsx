@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { backupFileName, eraseEverything, exportData, makeBackupText, openBackup, restoreAll, type BackupFile } from '../api/backup';
 import { ProtectOption, usePasswordPrompt, useProtectOption } from '../components/BackupPassword';
 import { storageEstimate } from '../api/db';
@@ -72,6 +73,7 @@ export default function ProfilePage() {
   return (
     <main className="container">
       <h1>Profile</h1>
+      <p className="muted"><Link to="/settings">Settings</Link> · <Link to="/history">History</Link> · <Link to="/search">Search all trips</Link> · <Link to="/help">Help</Link></p>
       {msg && <Alert kind="success">{msg}</Alert>}
 
       <form className="card" onSubmit={submit}>

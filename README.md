@@ -37,7 +37,12 @@ TripNest is a static web app. Trips are stored in your browser (IndexedDB) on th
 - **Map**, **search**, **printable booklet / PDF**, **.ics calendar export**.
 - **Back up / restore / import a trip file / erase everything**, optional **password protection** for backups and trip files, share through the phone share sheet, and a gentle backup reminder.
 - **Calendar export** with optional reminders (.ics), and an **Install** button on Android.
-- **Works offline** after the first visit, and installs to the home screen.
+- **Works offline** after the first visit, and installs to the home screen. A banner says when you are offline.
+- **Updates you control**: a "New version available" banner with **Update now**, the version number and last-updated date in Settings (the number is part of the offline cache's name), and a "What's new" note after each update. The dated [CHANGELOG](CHANGELOG.md) is the source.
+- **Undo / Redo** for edits (Ctrl/Cmd+Z too) with a **History** of the last 100 changes.
+- **Search everything** across all trips, a **Help** page, a first-visit **welcome card**, and "Add one now" buttons on empty screens.
+- **Settings**: a settings check (backup, lock, offline, sync, storage, updates), dark mode switch (Automatic / Light / Dark), text size, and an optional **app lock** (PIN or password).
+- **Storage warning** when the browser is nearly full or refuses to save.
 
 ## Stack
 React 18 + TypeScript + Vite (plain CSS) · IndexedDB · Leaflet/OpenStreetMap · a generated service worker · Vitest · Playwright. No backend. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -51,7 +56,7 @@ No environment variables or accounts are needed.
 
 ## Testing
 ```bash
-npm test           # 302 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
+npm test           # 327 unit, storage and property tests (money, splits, balances, time zones, backups, rules)
 npm run build      # typecheck + production build
 npm run test:e2e   # browser tests (Edge on a Windows PC, Chromium in CI): every screen on phone/dark/desktop, real user journeys, offline mode
 ```

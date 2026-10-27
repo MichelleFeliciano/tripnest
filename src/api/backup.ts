@@ -13,6 +13,7 @@ import { BUDGET_CATEGORIES, EXPENSE_CATEGORIES } from '../lib/budget';
 import { isValidTimeZone } from '../lib/time';
 import { ITEM_TYPES } from '../lib/itinerary';
 import { uuid } from '../lib/uuid';
+import { APP_VERSION } from '../lib/changelog';
 import { WrongPasswordError, decryptBackup, encryptBackup, isEncryptedBackup } from './crypto';
 
 export const BACKUP_FORMAT = 1;
@@ -22,6 +23,8 @@ export interface BackupFile {
   app: 'tripnest';
   format: number;
   exportedAt: string;
+  /** The TripNest version that wrote the file (information only; compatibility is decided by `format`). */
+  appVersion?: string;
   settings?: Settings;
   tables: Record<Table, Row[]>;
   files: Record<string, { type: string; data: string }>; // document id -> base64
@@ -75,7 +78,7 @@ export async function exportData(opts: { tripId?: string; includeFiles: boolean 
     });
     const files: BackupFile['files'] = {};
     for (const b of blobs) files[b.id] = { type: b.type, data: await blobToBase64(b.blob) };
-    return { app: 'tripnest', format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), settings: opts.tripId ? undefined : getSettings(), tables, files, ...(tombstones ? { tombstones } : {}) };
+    return { app: 'tripnest', format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), appVersion: APP_VERSION, settings: opts.tripId ? undefined : getSettings(), tables, files, ...(tombstones ? { tombstones } : {}) };
   } catch (e) { throw friendly(e); }
 }
 
@@ -287,7 +290,7 @@ export async function importTrips(file: BackupFile): Promise<string[]> {
 /** Remove everything stored on this device (trips, documents, preferences). */
 export async function eraseEverything(): Promise<void> {
   try {
-    await transaction(ALL, 'readwrite', async (x) => { for (const t of TABLES) await x.clear(t); await x.clear('blobs'); await x.clear('trash'); });
+    await transaction([...ALL, 'history'], 'readwrite', async (x) => { for (const t of TABLES) await x.clear(t); await x.clear('blobs'); await x.clear('trash'); await x.clear('history'); }, { journal: false });
     for (const store of ['localStorage', 'sessionStorage'] as const) {
       try { const s = window[store]; for (const k of Object.keys(s)) if (k.startsWith('tripnest:')) s.removeItem(k); } catch { /* storage unavailable */ }
     }

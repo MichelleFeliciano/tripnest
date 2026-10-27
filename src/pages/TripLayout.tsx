@@ -4,6 +4,7 @@ import { useToday } from '../hooks/hooks';
 import { Alert, Spinner, StatusBadge } from '../components/ui';
 import { formatDateRange, tripDuration } from '../lib/trip';
 import { countdown } from '../lib/countdown';
+import UndoRedo from '../components/UndoRedo';
 
 const TABS: [string, string][] = [
   ['', 'Overview'], ['itinerary', 'Itinerary'], ['explore', 'Explore'], ['reservations', 'Reservations'], ['details', 'Travel details'], ['packing', 'Packing'], ['todo', 'To-do'],
@@ -40,6 +41,7 @@ export default function TripLayout() {
           </div>
           <div className="trip-status"><StatusBadge status={trip.status} /> <strong className="countdown">{when.text}</strong></div>
         </div>
+        <UndoRedo />
         <nav className="tabs" aria-label="Trip sections">
           {TABS.map(([path, label]) => (
             <NavLink key={path} to={path ? `${base}/${path}` : base} end>{label}</NavLink>

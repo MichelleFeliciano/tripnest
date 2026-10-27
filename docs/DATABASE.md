@@ -1,6 +1,6 @@
 # Data model (on-device)
 
-Stored in the browser's IndexedDB database `tripnest` (version 2), plus a few preferences in localStorage (`tripnest:settings` for your name and time zone; `tripnest:device` for per-device notes such as the last backup date and whether weather is on; short-lived caches for weather and Explore results). One object store per table, keyed by `id` (UUID); every table except `trips` has an index on `trip_id`. A separate `blobs` store holds uploaded document files.
+Stored in the browser's IndexedDB database `tripnest` (version 3), plus a few preferences in localStorage (`tripnest:settings` for your name and time zone; `tripnest:device` for per-device notes such as the last backup date and whether weather is on; short-lived caches for weather and Explore results). One object store per table, keyed by `id` (UUID); every table except `trips` has an index on `trip_id`. A separate `blobs` store holds uploaded document files.
 
 | Store | Contents |
 |---|---|
@@ -15,6 +15,7 @@ Stored in the browser's IndexedDB database `tripnest` (version 2), plus a few pr
 | `budgets` | one row per (trip, category); `category = null` is the total |
 | `notes` | scope trip/destination/itinerary/reservation + target |
 | `tasks` | the pre-trip to-do list: title, optional due date, done, notes (added in version 2) |
+| `history` | the Undo / Redo list: for each recent action, the rows it changed (before and after), whether it can be undone, and whether it is currently undone. Newest 100 kept, never included in backups (added in version 3) |
 | `trash` | "Recently deleted": whatever a delete removed (rows, files and links to restore), kept 30 days, never included in backups (added in version 2) |
 | `documents` | file metadata; the file itself is in `blobs` under the same id |
 
